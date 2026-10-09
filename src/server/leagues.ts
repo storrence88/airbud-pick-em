@@ -154,28 +154,22 @@ export const leagueWeekQuery = (leagueId: string, week?: number) =>
 		refetchInterval: 30_000,
 	});
 
+/** Saves a pick and returns its confidence value (assigned by the DB in confidence leagues). */
 export const savePick = createServerFn({ method: "POST" })
 	.inputValidator(
 		z.object({
 			leagueId: z.string().uuid(),
 			gameId: z.string(),
 			team: z.string().min(2).max(4),
-			confidence: z.number().int().min(1).max(20).nullable().optional(),
 		}),
 	)
 	.handler(async ({ data }) => {
-		const { sb, user } = await requireUser();
-		const { error } = await sb.from("picks").upsert(
-			{
-				league_id: data.leagueId,
-				user_id: user.id,
-				game_id: data.gameId,
-				team: data.team,
-				confidence: data.confidence ?? null,
-				updated_at: new Date().toISOString(),
-			},
-			{ onConflict: "league_id,user_id,game_id" },
-		);
+		const { sb } = await requireUser();
+		const { data: confidence, error } = await sb.rpc("save_pick", {
+			p_league: data.leagueId,
+			p_game: data.gameId,
+			p_team: data.team,
+		});
 		// RLS rejects writes after kickoff.
 		if (error)
 			throw new Error(
@@ -183,8 +177,10 @@ export const savePick = createServerFn({ method: "POST" })
 					? "That game has already started."
 					: error.message,
 			);
+		return confidence as number | null;
 	});
 
+/** Re-ranks picks in one transaction; the DB rejects any value used twice in a week. */
 export const setConfidence = createServerFn({ method: "POST" })
 	.inputValidator(
 		z.object({
@@ -196,25 +192,20 @@ export const setConfidence = createServerFn({ method: "POST" })
 						confidence: z.number().int().min(1).max(20),
 					}),
 				)
-				.max(20),
+				.max(20)
+				.refine(
+					(vs) => new Set(vs.map((v) => v.confidence)).size === vs.length,
+					"Each confidence value can only be used once.",
+				),
 		}),
 	)
 	.handler(async ({ data }) => {
-		const { sb, user } = await requireUser();
-		for (const v of data.values) {
-			const { error } = await sb
-				.from("picks")
-				.update({
-					confidence: v.confidence,
-					updated_at: new Date().toISOString(),
-				})
-				.match({
-					league_id: data.leagueId,
-					user_id: user.id,
-					game_id: v.gameId,
-				});
-			if (error) throw new Error(error.message);
-		}
+		const { sb } = await requireUser();
+		const { error } = await sb.rpc("set_confidence", {
+			p_league: data.leagueId,
+			p_values: data.values,
+		});
+		if (error) throw new Error(error.message);
 	});
 
 /** Every revealed pick on finished games this season, for the standings. */

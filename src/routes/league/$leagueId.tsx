@@ -7,8 +7,10 @@ import {
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Check, Copy } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ConfidenceBoard } from "#/components/ConfidenceBoard";
 import { GameCard } from "#/components/GameCard";
+import { type ConfidenceChange, nextFreeValue, repair } from "#/lib/confidence";
 import type { Game } from "#/lib/nfl/types";
 import { SCORING_MODES } from "#/lib/scoring";
 import { computeStandings } from "#/lib/standings";
@@ -152,12 +154,7 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 		[members],
 	);
 	const isConfidence = league.mode === "confidence";
-	const lockedValues = new Set(
-		games
-			.filter((g) => g.state !== "pre")
-			.map((g) => mine.get(g.id)?.confidence)
-			.filter((v) => v != null),
-	);
+	const [view, setView] = useState<"pick" | "rank">("pick");
 
 	const updatePicks = (fn: (picks: PickRow[]) => PickRow[]) =>
 		qc.setQueryData(query.queryKey, (old) =>
@@ -165,11 +162,15 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 		);
 
 	const pick = useMutation({
+		// confidence here is only the optimistic guess; the server assigns the real one.
 		mutationFn: (vars: {
 			gameId: string;
 			team: string;
 			confidence: number | null;
-		}) => savePick({ data: { leagueId, ...vars } }),
+		}) =>
+			savePick({
+				data: { leagueId, gameId: vars.gameId, team: vars.team },
+			}),
 		onMutate: async (vars) => {
 			setError("");
 			await qc.cancelQueries({ queryKey: query.queryKey });
@@ -187,6 +188,16 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 			]);
 			return { prev };
 		},
+		onSuccess: (value, vars) => {
+			if (value !== vars.confidence)
+				updatePicks((picks) =>
+					picks.map((p) =>
+						p.user_id === userId && p.game_id === vars.gameId
+							? { ...p, confidence: value }
+							: p,
+					),
+				);
+		},
 		onError: (err, _vars, ctx) => {
 			setError((err as Error).message);
 			if (ctx?.prev) qc.setQueryData(query.queryKey, ctx.prev);
@@ -194,9 +205,10 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 	});
 
 	const confidence = useMutation({
-		mutationFn: (values: { gameId: string; confidence: number }[]) =>
+		mutationFn: (values: ConfidenceChange[]) =>
 			setConfidence({ data: { leagueId, values } }),
 		onMutate: (values) => {
+			setError("");
 			const byGame = new Map(values.map((v) => [v.gameId, v.confidence]));
 			updatePicks((picks) =>
 				picks.map((p) =>
@@ -214,27 +226,36 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 
 	function choose(g: WeekGame, team: string) {
 		let value = mine.get(g.id)?.confidence ?? null;
-		if (isConfidence && value == null) {
-			const used = new Set([...mine.values()].map((p) => p.confidence));
-			value =
-				Array.from({ length: games.length }, (_, i) => i + 1).find(
-					(v) => !used.has(v),
-				) ?? null;
-		}
+		if (isConfidence && value == null)
+			value = nextFreeValue(
+				[...mine.values()].map((p) => p.confidence),
+				games.length,
+			);
 		pick.mutate({ gameId: g.id, team, confidence: value });
 	}
 
-	/** Give this game the chosen value; whichever open game had it takes this game's old value. */
-	function rank(g: WeekGame, value: number) {
-		const current = mine.get(g.id)?.confidence ?? null;
-		const other = [...mine.values()].find(
-			(p) => p.confidence === value && p.game_id !== g.id,
+	// Picks saved before values were unique may share a value; untangle them once.
+	const repaired = useRef(false);
+	useEffect(() => {
+		if (!isConfidence || repaired.current) return;
+		repaired.current = true;
+		const changes = repair(
+			games.flatMap((g) => {
+				const p = mine.get(g.id);
+				return p
+					? [
+							{
+								gameId: g.id,
+								confidence: p.confidence,
+								locked: g.state !== "pre",
+							},
+						]
+					: [];
+			}),
+			games.length,
 		);
-		const changes = [{ gameId: g.id, confidence: value }];
-		if (other && current != null)
-			changes.push({ gameId: other.game_id, confidence: current });
-		confidence.mutate(changes);
-	}
+		if (changes.length) confidence.mutate(changes);
+	}, [isConfidence, games, mine, confidence]);
 
 	const made = games.filter((g) => mine.has(g.id)).length;
 
@@ -259,61 +280,146 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 				/>
 			</div>
 			{error && <p className="mt-3 text-sm text-loss">{error}</p>}
-			<div className="mt-6 grid gap-4 md:grid-cols-2">
-				{games.map((g) => {
-					const myPick = mine.get(g.id);
-					const locked = g.state !== "pre";
-					const others: Record<string, string[]> = {};
-					if (locked) {
-						for (const p of data.picks) {
-							if (p.game_id !== g.id || p.user_id === userId) continue;
-							others[p.team] = [
-								...(others[p.team] ?? []),
-								names.get(p.user_id) ?? "Player",
-							];
-						}
-					}
-					return (
-						<GameCard
-							key={g.id}
-							game={g}
-							picked={myPick?.team}
-							onPick={(team) => choose(g, team)}
-							lineText={league.mode === "spread" ? lineText(g) : g.spreadText}
-							others={others}
-							footer={
-								isConfidence && (
-									<label className="flex items-center justify-between border-t px-4 py-2 text-sm">
-										<span className="text-muted-foreground">Confidence</span>
-										<select
-											value={myPick?.confidence ?? ""}
-											disabled={!myPick || locked}
-											onChange={(e) => rank(g, Number(e.target.value))}
-											className="rounded-md border bg-background px-2 py-1 font-display text-lg font-semibold tabular-nums disabled:opacity-50"
-										>
-											{!myPick && <option value="">–</option>}
-											{Array.from(
-												{ length: games.length },
-												(_, i) => games.length - i,
-											)
-												.filter(
-													(v) =>
-														!lockedValues.has(v) || v === myPick?.confidence,
-												)
-												.map((v) => (
-													<option key={v} value={v}>
-														{v}
-													</option>
-												))}
-										</select>
-									</label>
-								)
+			{isConfidence && (
+				<div className="relative mt-6 grid grid-cols-2 rounded-full border bg-card p-1 text-sm font-semibold lg:hidden">
+					{(
+						[
+							["pick", "Pick winners"],
+							["rank", "Rank confidence"],
+						] as const
+					).map(([v, label]) => (
+						<button
+							key={v}
+							type="button"
+							onClick={() => setView(v)}
+							className={cn(
+								"relative rounded-full py-1.5 transition-colors",
+								view === v
+									? "text-primary-foreground"
+									: "text-muted-foreground",
+							)}
+						>
+							{view === v && (
+								<motion.span
+									layoutId="confidence-view"
+									className="absolute inset-0 rounded-full bg-primary"
+									transition={{ type: "spring", stiffness: 400, damping: 32 }}
+								/>
+							)}
+							<span className="relative">{label}</span>
+						</button>
+					))}
+				</div>
+			)}
+			<div
+				className={cn(
+					isConfidence &&
+						"lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6",
+				)}
+			>
+				<div
+					className={cn(
+						"mt-6 grid gap-4 md:grid-cols-2",
+						isConfidence && "lg:grid-cols-1",
+						isConfidence && view === "rank" && "hidden lg:grid",
+					)}
+				>
+					{games.map((g) => {
+						const myPick = mine.get(g.id);
+						const locked = g.state !== "pre";
+						const others: Record<string, string[]> = {};
+						if (locked) {
+							for (const p of data.picks) {
+								if (p.game_id !== g.id || p.user_id === userId) continue;
+								others[p.team] = [
+									...(others[p.team] ?? []),
+									names.get(p.user_id) ?? "Player",
+								];
 							}
-						/>
-					);
-				})}
+						}
+						return (
+							<GameCard
+								key={g.id}
+								game={g}
+								picked={myPick?.team}
+								onPick={(team) => choose(g, team)}
+								lineText={league.mode === "spread" ? lineText(g) : g.spreadText}
+								others={others}
+								footer={
+									isConfidence && (
+										<ConfidenceFooter
+											value={myPick?.confidence ?? null}
+											picked={!!myPick}
+											locked={locked}
+											onRank={() => setView("rank")}
+										/>
+									)
+								}
+							/>
+						);
+					})}
+				</div>
+				{isConfidence && (
+					<ConfidenceBoard
+						games={games}
+						picks={mine}
+						onRerank={(changes) => confidence.mutate(changes)}
+						className={cn(
+							"mt-6 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto",
+							view === "pick" && "hidden lg:block",
+						)}
+					/>
+				)}
 			</div>
 		</section>
+	);
+}
+
+function ConfidenceFooter({
+	value,
+	picked,
+	locked,
+	onRank,
+}: {
+	value: number | null;
+	picked: boolean;
+	locked: boolean;
+	onRank: () => void;
+}) {
+	return (
+		<div className="flex items-center justify-between border-t px-4 py-2 text-sm">
+			<span className="text-muted-foreground">
+				{!picked
+					? "Pick a winner to rank it"
+					: locked
+						? "Confidence"
+						: "Confidence · drag to rerank"}
+			</span>
+			<span className="flex items-center gap-2">
+				{picked && !locked && (
+					<button
+						type="button"
+						onClick={onRank}
+						className="text-xs font-semibold text-primary lg:hidden"
+					>
+						Rank
+					</button>
+				)}
+				<span className="relative grid h-8 min-w-10 place-items-center overflow-hidden rounded-md bg-muted px-2 font-display text-lg font-semibold tabular-nums">
+					<AnimatePresence mode="popLayout" initial={false}>
+						<motion.span
+							key={value ?? "none"}
+							initial={{ y: 16, opacity: 0 }}
+							animate={{ y: 0, opacity: 1 }}
+							exit={{ y: -16, opacity: 0 }}
+							transition={{ type: "spring", stiffness: 500, damping: 36 }}
+						>
+							{value ?? "–"}
+						</motion.span>
+					</AnimatePresence>
+				</span>
+			</span>
+		</div>
 	);
 }
 
