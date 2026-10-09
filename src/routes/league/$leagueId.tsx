@@ -9,7 +9,7 @@ import { Check, Copy } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfidenceBoard } from "#/components/ConfidenceBoard";
-import { GameCard } from "#/components/GameCard";
+import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { type ConfidenceChange, nextFreeValue, repair } from "#/lib/confidence";
 import type { Game } from "#/lib/nfl/types";
 import { SCORING_MODES } from "#/lib/scoring";
@@ -383,6 +383,7 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 					/>
 				)}
 			</div>
+			<PublicPicksNote games={games} />
 		</section>
 	);
 }

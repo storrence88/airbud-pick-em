@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { withPublicPicks } from "#/lib/nfl/espn-pickem";
 import type { ScoringMode } from "#/lib/scoring";
 import { getSupabaseServerClient } from "#/lib/supabase.server";
 import { syncWeek } from "./sync";
@@ -107,7 +108,7 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 		if (error) throw new Error(error.message);
 		if (!league) throw new Error("League not found, or you are not a member.");
 
-		const games = await syncWeek(data.week);
+		const games = await withPublicPicks(await syncWeek(data.week));
 		const gameIds = games.map((g) => g.id);
 		const [{ data: members }, { data: picks }] = await Promise.all([
 			sb
