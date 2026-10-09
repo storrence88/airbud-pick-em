@@ -20,7 +20,7 @@ export function BotAccess({ leagueId }: { leagueId: string }) {
 				<span className="flex-1">
 					<span className="block font-semibold">Discord bot access</span>
 					<span className="block text-sm text-muted-foreground">
-						Let a Discord bot show this league's games and picks.
+						Let a Discord bot show this league's games, picks and standings.
 					</span>
 				</span>
 				<ChevronDown

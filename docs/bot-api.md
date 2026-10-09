@@ -1,7 +1,7 @@
 # Pick'em Bot API
 
 A read-only JSON API so a Discord bot can post upcoming games, remind people to
-pick, and show everyone's picks once a game kicks off. Picks themselves are made
+pick, show everyone's picks once a game kicks off, and show the standings. Picks themselves are made
 in the app.
 
 Base URL: `https://<your-app>.vercel.app/api/bot`
@@ -65,6 +65,23 @@ curl -H "Authorization: Bearer $PICKEM_KEY" https://<app>/api/bot/games/latest
 `404` with an `error` message when there's no such game (for example
 `/games/latest` before the season's first kickoff).
 
+### `GET /standings`
+
+Season standings from finished games, best first. Same numbers as the app's
+Standings tab.
+
+```json
+{
+  "standings": [
+    { "rank": 1, "displayName": "Steven", "discordId": "123456789012345678", "points": 212, "correct": 58, "byWeek": { "1": 31, "2": 40 } },
+    { "rank": 2, "displayName": "Nate", "discordId": "234567890123456789", "points": 198, "correct": 55, "byWeek": { "1": 28, "2": 37 } }
+  ]
+}
+```
+
+`points` is the season total. `correct` is the number of correct picks, used to
+break ties. `byWeek` has points per week.
+
 ### A game
 
 ```json
@@ -127,6 +144,14 @@ async function nfl(interaction) {
   await interaction.reply(
     `**${game.away.abbr} ${game.away.score} @ ${game.home.abbr} ${game.home.score}** · ${game.status}\n` +
       (lines.join("\n") || "Nobody picked this one."),
+  );
+}
+
+// /standings
+async function standings(interaction) {
+  const { standings } = await get("/standings");
+  await interaction.reply(
+    standings.map((r) => `${r.rank}. ${r.displayName} · ${r.points} pts`).join("\n"),
   );
 }
 
