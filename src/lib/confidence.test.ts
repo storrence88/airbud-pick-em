@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+	forfeited,
 	move,
 	nextFreeValue,
 	type RankedPick,
 	rankOrder,
 	reassign,
 	repair,
+	settle,
 } from "./confidence";
 
 const p = (gameId: string, confidence: number | null, locked = false) =>
@@ -77,5 +79,48 @@ describe("repair", () => {
 
 	it("leaves clean picks alone", () => {
 		expect(repair([p("a", 2), p("b", 1)], 2)).toEqual([]);
+	});
+});
+
+describe("missed games", () => {
+	// 15 games, Thursday ("thu") kicked off with no pick, 14 Sunday picks at 1..14.
+	const sunday = Array.from({ length: 14 }, (_, i) => p(`g${i + 1}`, i + 1));
+
+	it("gives up the lowest value the locked picks don't hold", () => {
+		expect(forfeited(sunday, 15, 1)).toEqual([1]);
+		expect(forfeited([p("a", 1, true), p("b", 3, true)], 5, 2)).toEqual([2, 4]);
+		expect(forfeited(sunday, 15, 0)).toEqual([]);
+	});
+
+	it("slides every pick up one so the top value is usable again", () => {
+		const changes = settle(sunday, 15, 1);
+		expect(changes).toHaveLength(14);
+		expect(changes.find((c) => c.gameId === "g14")?.confidence).toBe(15);
+		expect(changes.find((c) => c.gameId === "g1")?.confidence).toBe(2);
+	});
+
+	it("only shifts up to the first gap", () => {
+		expect(settle([p("a", 1), p("b", 2), p("c", 4)], 5, 1)).toEqual([
+			{ gameId: "a", confidence: 2 },
+			{ gameId: "b", confidence: 3 },
+		]);
+	});
+
+	it("steps over values locked picks hold", () => {
+		expect(settle([p("a", 1), p("b", 2, true), p("c", 3)], 4, 1)).toEqual([
+			{ gameId: "a", confidence: 3 },
+			{ gameId: "c", confidence: 4 },
+		]);
+	});
+
+	it("never hands a forfeited value to a repaired pick", () => {
+		expect(settle([p("a", 3), p("b", 3)], 3, 1)).toEqual([
+			{ gameId: "b", confidence: 2 },
+		]);
+	});
+
+	it("leaves settled picks alone", () => {
+		expect(settle([p("a", 2), p("b", 3)], 3, 1)).toEqual([]);
+		expect(settle([p("a", 2), p("b", 1)], 2)).toEqual([]);
 	});
 });

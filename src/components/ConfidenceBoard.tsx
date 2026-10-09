@@ -8,6 +8,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	type ConfidenceChange,
+	forfeited,
 	move,
 	type RankedPick,
 	rankOrder,
@@ -20,6 +21,8 @@ interface Props {
 	games: Game[];
 	/** The user's picks this week, by game id. */
 	picks: Map<string, { team: string; confidence: number | null }>;
+	/** Games that kicked off without a pick. */
+	missed: number;
 	onRerank: (changes: ConfidenceChange[]) => void;
 	className?: string;
 }
@@ -31,7 +34,13 @@ const spring = { type: "spring", stiffness: 500, damping: 40 } as const;
  * arrows) reorders the games while the point values stay in their slots, so a
  * value can never be given to two games.
  */
-export function ConfidenceBoard({ games, picks, onRerank, className }: Props) {
+export function ConfidenceBoard({
+	games,
+	picks,
+	missed,
+	onRerank,
+	className,
+}: Props) {
 	const byId = useMemo(() => new Map(games.map((g) => [g.id, g])), [games]);
 	const ranked: RankedPick[] = useMemo(
 		() =>
@@ -72,6 +81,7 @@ export function ConfidenceBoard({ games, picks, onRerank, className }: Props) {
 		.filter((p) => p.locked && p.confidence != null)
 		.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
 	const used = new Set(ranked.map((p) => p.confidence));
+	const lost = forfeited(ranked, games.length, missed);
 	const unpicked = games.filter((g) => g.state === "pre" && !picks.has(g.id));
 
 	function commit(next: string[]) {
@@ -98,7 +108,17 @@ export function ConfidenceBoard({ games, picks, onRerank, className }: Props) {
 				Drag your surest pick to the top. Each point value is used once.
 			</p>
 
-			<ValueStrip count={games.length} used={used} />
+			<ValueStrip count={games.length} used={used} lost={lost} />
+
+			{lost.length > 0 && (
+				<p className="mt-2 text-xs text-muted-foreground">
+					{missed === 1
+						? "You missed a game, so it scores 0"
+						: `You missed ${missed} games, so they score 0`}{" "}
+					and {lost.join(", ")} {lost.length === 1 ? "goes" : "go"} unused. Your
+					top values are still yours to rank.
+				</p>
+			)}
 
 			{order.length === 0 && locked.length === 0 && (
 				<p className="mt-6 rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
@@ -290,13 +310,15 @@ function Matchup({ game, team }: { game: Game; team: string }) {
 	);
 }
 
-/** 1..N pills, filled once a value is spoken for. */
+/** 1..N pills, filled once a value is spoken for, struck out when a missed game gave it up. */
 function ValueStrip({
 	count,
 	used,
+	lost,
 }: {
 	count: number;
 	used: Set<number | null>;
+	lost: number[];
 }) {
 	return (
 		<div className="mt-3 flex flex-wrap gap-1" aria-hidden>
@@ -310,7 +332,10 @@ function ValueStrip({
 							: "var(--muted-foreground)",
 					}}
 					transition={{ duration: 0.2 }}
-					className="grid h-6 min-w-6 place-items-center rounded px-1 text-[11px] font-semibold tabular-nums"
+					className={cn(
+						"grid h-6 min-w-6 place-items-center rounded px-1 text-[11px] font-semibold tabular-nums",
+						lost.includes(v) && "line-through opacity-50",
+					)}
 				>
 					{v}
 				</motion.span>
