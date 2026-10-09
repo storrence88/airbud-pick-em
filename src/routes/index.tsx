@@ -1,10 +1,24 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
+import { useEffect } from "react";
+import { authErrorMessage } from "#/lib/auth-errors";
 import { SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
+	const navigate = useNavigate();
+	// Supabase sends failed sign-in links to the site root with the error in
+	// the query string or hash; show it on the sign-in page instead.
+	useEffect(() => {
+		const { search, hash } = window.location;
+		const message =
+			authErrorMessage(new URLSearchParams(search)) ??
+			authErrorMessage(new URLSearchParams(hash.slice(1)));
+		if (message)
+			navigate({ to: "/login", search: { error: message }, replace: true });
+	}, [navigate]);
+
 	return (
 		<main className="mx-auto max-w-5xl px-4 py-16">
 			<motion.h1
