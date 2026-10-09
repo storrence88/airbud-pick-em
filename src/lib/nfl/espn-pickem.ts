@@ -1,6 +1,6 @@
 import type { Game, PublicPicks } from "./types";
 
-// ESPN Pigskin Pick'em's public challenge feed (unofficial, can change). Each
+// ESPN NFL Pick'em's public challenge feed (unofficial, can change). Each
 // proposition is one game; each outcome carries how many players picked it.
 const CHALLENGE = "https://gambit-api.fantasy.espn.com/apis/v1/challenges";
 
@@ -13,7 +13,11 @@ interface Outcome {
 	abbrev?: string;
 	name?: string;
 	mappings?: Mapping[];
-	choiceCounters?: { count?: number; percentage?: number }[];
+	choiceCounters?: {
+		scoringFormatId?: number;
+		count?: number;
+		percentage?: number;
+	}[];
 }
 
 export interface PickemChallenge {
@@ -23,8 +27,20 @@ export interface PickemChallenge {
 	}[];
 }
 
+// Counters come per scoring format, in no fixed order. Format 1 (standard)
+// has the most entries; without it, sum every format.
+const STANDARD_FORMAT = 1;
+
 function share(o: Outcome) {
-	const c = o.choiceCounters?.[0];
+	const counters = o.choiceCounters ?? [];
+	const c =
+		counters.find((x) => x.scoringFormatId === STANDARD_FORMAT) ??
+		(counters.length > 1
+			? {
+					count: counters.reduce((n, x) => n + (x.count ?? 0), 0),
+					percentage: undefined,
+				}
+			: counters[0]);
 	return { count: c?.count, pct: c?.percentage };
 }
 
@@ -78,12 +94,18 @@ async function fetchChallenge(season: number, week: number) {
 	const key = `${season}-${week}`;
 	const hit = cache.get(key);
 	if (hit && Date.now() - hit.at < CACHE_MS) return hit.data;
-	const url = new URL(`${CHALLENGE}/nfl-pigskin-pickem-${season}`);
-	url.searchParams.set("scoringPeriodId", String(week));
-	url.searchParams.set("platform", "chui");
-	url.searchParams.set("view", "chui_default");
-	const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
-	if (!res.ok) throw new Error(`ESPN pick'em ${res.status}`);
+	// ESPN renamed the game for 2026 ("NFL Pick'em"); older seasons used the
+	// Pigskin key.
+	let res: Response | undefined;
+	for (const slug of [`nfl-pickem-${season}`, `nfl-pigskin-pickem-${season}`]) {
+		const url = new URL(`${CHALLENGE}/${slug}`);
+		url.searchParams.set("scoringPeriodId", String(week));
+		url.searchParams.set("platform", "chui");
+		url.searchParams.set("view", "chui_default");
+		res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+		if (res.ok) break;
+	}
+	if (!res?.ok) throw new Error(`ESPN pick'em ${res?.status}`);
 	const data = (await res.json()) as PickemChallenge;
 	cache.set(key, { at: Date.now(), data });
 	return data;
