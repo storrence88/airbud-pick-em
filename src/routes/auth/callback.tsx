@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { authErrorMessage } from "#/lib/auth-errors";
 import { getSupabaseServerClient } from "#/lib/supabase.server";
 
-/** Magic-link landing: swaps the one-time code for a session cookie. */
+/** Magic-link and Discord landing: swaps the one-time code for a session cookie. */
 export const Route = createFileRoute("/auth/callback")({
 	server: {
 		handlers: {
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/auth/callback")({
 						await getSupabaseServerClient().auth.exchangeCodeForSession(code);
 					if (error)
 						return toLogin(
-							"That sign-in link didn't work. Send yourself a new one from this browser.",
+							"That sign-in didn't work. Try again from this browser.",
 						);
 				}
 				return new Response(null, { status: 302, headers: { Location: dest } });
