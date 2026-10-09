@@ -89,10 +89,11 @@ curl -H "Authorization: Bearer $PICKEM_KEY" \
       "locked": false,
       "state": "pre",
       "status": "10/11 - 1:00 PM EDT",
-      "away": { "abbr": "BUF", "name": "Bills", "score": 0 },
-      "home": { "abbr": "KC", "name": "Chiefs", "score": 0 },
+      "away": { "abbr": "BUF", "name": "Buffalo Bills", "shortName": "Bills", "record": "4-1", "logo": "https://a.espncdn.com/…/buf.png", "score": 0 },
+      "home": { "abbr": "KC", "name": "Kansas City Chiefs", "shortName": "Chiefs", "record": "3-2", "logo": "https://a.espncdn.com/…/kc.png", "score": 0 },
       "spread": -2.5,
       "spreadText": "KC -2.5",
+      "publicPicks": { "home": 58, "away": 42 },
       "myPick": { "team": "KC", "confidence": 14 },
       "picks": []
     }
@@ -101,6 +102,9 @@ curl -H "Authorization: Bearer $PICKEM_KEY" \
 ```
 
 - `id` is the game id to use when picking.
+- `kickoff` is the game time in UTC (ISO 8601). In discord.js, `<t:${Math.floor(Date.parse(kickoff) / 1000)}:F>` shows it in each viewer's own time zone.
+- `record` is the team's season record, or `null` before ESPN has one.
+- `publicPicks` is the share of ESPN NFL Pick'em players picking each side (whole percentages adding to 100), or `null` when ESPN hasn't published it. Source: ESPN Pigskin Pick'em.
 - `spread` is the home team's line (negative means home is favored). In
   against-the-spread leagues it's frozen at kickoff and that's the line scored.
 - `picks` lists other members' picks and is empty until `locked` is `true`.

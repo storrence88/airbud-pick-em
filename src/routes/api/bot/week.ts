@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { withPublicPicks } from "#/lib/nfl/espn-pickem";
+import type { Team } from "#/lib/nfl/types";
 import {
 	ApiError,
 	botHandler,
@@ -8,6 +10,17 @@ import {
 	visiblePicks,
 } from "#/server/bot";
 import { syncWeek } from "#/server/sync";
+
+function team(t: Team, score: number) {
+	return {
+		abbr: t.abbr,
+		name: t.name,
+		shortName: t.shortName,
+		record: t.record ?? null,
+		logo: t.logo,
+		score,
+	};
+}
 
 /**
  * A week's games with the asking member's picks, plus everyone's picks on
@@ -31,7 +44,7 @@ export const Route = createFileRoute("/api/bot/week")({
 					? await memberForDiscord(ctx, discordId)
 					: null;
 
-				const games = await syncWeek(week);
+				const games = await withPublicPicks(await syncWeek(week));
 				const ids = games.map((g) => g.id);
 				const [members, { data: picks }, { data: locked }] = await Promise.all([
 					leagueMembers(ctx),
@@ -61,19 +74,13 @@ export const Route = createFileRoute("/api/bot/week")({
 							locked: new Date(g.kickoff) <= now,
 							state: g.state,
 							status: g.statusText,
-							away: {
-								abbr: g.away.abbr,
-								name: g.away.name,
-								score: g.awayScore,
-							},
-							home: {
-								abbr: g.home.abbr,
-								name: g.home.name,
-								score: g.homeScore,
-							},
+							away: team(g.away, g.awayScore),
+							home: team(g.home, g.homeScore),
 							// Home team's line (negative = home favored); frozen at kickoff.
 							spread: lockedSpread.get(g.id) ?? g.spread,
 							spreadText: g.spreadText,
+							// Share of ESPN Pick'em players picking each side, when ESPN has it.
+							publicPicks: g.publicPicks ?? null,
 							myPick: mine
 								? { team: mine.team, confidence: mine.confidence }
 								: null,
