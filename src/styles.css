@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Oswald:wght@500;600;700&display=swap');
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(0.985 0.002 260);
+  --foreground: oklch(0.18 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 260);
+  --muted: oklch(0.95 0.006 260);
+  --muted-foreground: oklch(0.5 0.02 260);
+  --primary: oklch(0.6 0.2 145);
+  --primary-foreground: oklch(0.99 0 0);
+  --accent: oklch(0.94 0.03 145);
+  --border: oklch(0.91 0.008 260);
+  --ring: oklch(0.6 0.2 145);
+  --win: oklch(0.62 0.18 150);
+  --loss: oklch(0.6 0.2 25);
+  --radius: 1rem;
+}
+
+.dark {
+  --background: oklch(0.15 0.015 260);
+  --foreground: oklch(0.96 0.005 260);
+  --card: oklch(0.2 0.018 260);
+  --card-foreground: oklch(0.96 0.005 260);
+  --muted: oklch(0.25 0.018 260);
+  --muted-foreground: oklch(0.7 0.015 260);
+  --primary: oklch(0.75 0.2 145);
+  --primary-foreground: oklch(0.15 0.02 260);
+  --accent: oklch(0.3 0.05 145);
+  --border: oklch(0.3 0.018 260);
+  --ring: oklch(0.75 0.2 145);
+}
+
+@theme inline {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Oswald', 'Inter', sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-win: var(--win);
+  --color-loss: var(--loss);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 8px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    @apply min-h-full bg-background text-foreground antialiased;
+  }
+  body {
+    background-image: radial-gradient(
+      1200px 600px at 50% -200px,
+      color-mix(in oklab, var(--primary) 14%, transparent),
+      transparent 70%
+    );
+  }
+}

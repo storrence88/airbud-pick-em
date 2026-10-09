@@ -1,0 +1,67 @@
+import { describe, expect, it } from "vitest";
+import { type EspnScoreboard, parseHomeSpread, parseScoreboard } from "./espn";
+
+describe("parseHomeSpread", () => {
+	it("reads the favorite from details", () => {
+		expect(parseHomeSpread("KC -3.5", "KC", "BUF")).toBe(-3.5);
+		expect(parseHomeSpread("BUF -3.5", "KC", "BUF")).toBe(3.5);
+		expect(parseHomeSpread("EVEN", "KC", "BUF")).toBe(0);
+		expect(parseHomeSpread(undefined, "KC", "BUF")).toBeNull();
+	});
+});
+
+describe("parseScoreboard", () => {
+	it("maps an event to a game", () => {
+		const data: EspnScoreboard = {
+			season: { year: 2026 },
+			week: { number: 6 },
+			events: [
+				{
+					id: "401",
+					date: "2026-10-11T17:00Z",
+					competitions: [
+						{
+							status: {
+								type: { state: "pre", shortDetail: "10/11 - 1:00 PM EDT" },
+							},
+							odds: [{ details: "BUF -2.5" }],
+							competitors: [
+								{
+									homeAway: "home",
+									score: "0",
+									team: {
+										id: "12",
+										abbreviation: "KC",
+										displayName: "Kansas City Chiefs",
+										shortDisplayName: "Chiefs",
+										color: "e31837",
+									},
+								},
+								{
+									homeAway: "away",
+									score: "0",
+									team: {
+										id: "2",
+										abbreviation: "BUF",
+										displayName: "Buffalo Bills",
+										shortDisplayName: "Bills",
+										color: "00338d",
+									},
+								},
+							],
+						},
+					],
+				},
+			],
+		};
+		const [g] = parseScoreboard(data);
+		expect(g).toMatchObject({
+			id: "401",
+			week: 6,
+			season: 2026,
+			spread: 2.5,
+			state: "pre",
+		});
+		expect(g.home.color).toBe("#e31837");
+	});
+});
