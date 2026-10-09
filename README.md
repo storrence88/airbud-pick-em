@@ -22,7 +22,7 @@ Other scripts: `npm test` (Vitest), `npm run check` (Biome), `npm run build`.
 
 ## One-time setup
 
-1. **Database:** paste `supabase/migrations/0001_init.sql` into the Supabase SQL editor and run it.
+1. **Database:** run each file in `supabase/migrations/` in order in the Supabase SQL editor.
 2. **Auth redirect:** in Supabase > Authentication > URL Configuration, set the Site URL to your Vercel URL and add `http://localhost:3000/**` and `https://<your-app>.vercel.app/**` as redirect URLs.
 3. **Vercel:** import the repo and set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `CRON_SECRET` (any random string).
 
@@ -40,6 +40,7 @@ Other scripts: `npm test` (Vitest), `npm run check` (Biome), `npm run build`.
 - `src/server/`: server functions for auth, leagues, picks and the game sync
 - `supabase/migrations/`: tables, security rules, and the create/join league functions
 - `src/routes/`: home, sign in, my leagues, new league, league (picks + standings), invite links
+- `src/routes/api/bot/`: JSON API for a Discord bot to read the week and make picks; see [docs/bot-api.md](docs/bot-api.md)
 
 ## Status
 

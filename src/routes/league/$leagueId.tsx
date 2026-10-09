@@ -8,6 +8,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Check, Copy, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { BotAccess } from "#/components/BotAccess";
 import { ConfidenceBoard } from "#/components/ConfidenceBoard";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { type ConfidenceChange, nextFreeValue, repair } from "#/lib/confidence";
@@ -53,6 +54,9 @@ function LeaguePage() {
 	const [tab, setTab] = useState<"picks" | "standings">("picks");
 	const { data } = useSuspenseQuery(leagueWeekQuery(leagueId));
 	const { league } = data;
+	const isCommissioner = data.members.some(
+		(m) => m.user_id === data.userId && m.role === "commissioner",
+	);
 
 	return (
 		<main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
@@ -104,6 +108,7 @@ function LeaguePage() {
 					)}
 				</motion.div>
 			</AnimatePresence>
+			{isCommissioner && <BotAccess leagueId={leagueId} />}
 		</main>
 	);
 }
