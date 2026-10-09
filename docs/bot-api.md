@@ -1,201 +1,142 @@
 # Pick'em Bot API
 
-A small JSON API so a Discord bot can show the week's games, make picks and set
-confidence points for league members. Anything the bot does shows up in the app
-right away, and the app's rules still apply.
+A read-only JSON API so a Discord bot can post upcoming games, remind people to
+pick, and show everyone's picks once a game kicks off. Picks themselves are made
+in the app.
 
 Base URL: `https://<your-app>.vercel.app/api/bot`
 
 ## Auth
 
 The league commissioner creates a key on the league page under **Discord bot
-access**. The key is shown once; it starts with `pickem_`. Send it on every
+access**. The key is shown once and starts with `pickem_`. Send it on every
 request:
 
 ```
 Authorization: Bearer pickem_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-A key belongs to one league. The commissioner can revoke it from the same
-panel, and a revoked key gets `401` immediately.
+A key belongs to one league and can only read. The commissioner can revoke it
+from the same panel, and a revoked key gets `401` immediately. Keep it on the
+bot's server.
 
-Keep the key on the bot's server, never in a Discord message or client code.
-Whoever has it can make picks for any linked member of the league.
+## The one rule
 
-## Who a request is for
-
-Requests that act for a person take `discordId`: the Discord user id
-(snowflake) of the person who ran the command, e.g. `interaction.user.id` in
-discord.js. The bot should always pass the id of the person who invoked the
-command, not one they typed.
-
-A Discord user can only be matched once they've signed in to the app with
-Discord at least once. Until then the API answers `404` with
-`No Pick'em account is linked to that Discord user...`; a good bot reply is a
-link to the app's sign-in page.
-
-## Rules the API enforces
-
-- **Picks lock at kickoff.** Changing a pick or its confidence after kickoff
-  returns `409`.
-- **Friends' picks stay hidden until kickoff.** `GET /week` shows the asking
-  member's own picks, and everyone else's picks only for games that have started.
-- **Scoring mode.** `confidence` is `null` outside confidence leagues, and
-  `POST /confidence` returns `400` there.
-- **Confidence values are unique per week.** Each value from 1 to the number of
-  games that week can be used once. A first pick gets the lowest free value
-  (same as the app); use `POST /confidence` to rearrange.
+People's picks stay hidden until their game kicks off, the same as in the app.
+Before kickoff a game's `picks` list is empty, but `notPicked` still says who
+hasn't picked yet (without revealing what anyone else picked), which is what
+reminders need.
 
 ## Endpoints
 
-### `GET /league`
+### `GET /week?week=6`
 
-League info and members.
-
-```bash
-curl -H "Authorization: Bearer $PICKEM_KEY" https://<app>/api/bot/league
-```
-
-```json
-{
-  "league": { "id": "…", "name": "Sunday Scaries", "season": 2026, "mode": "confidence" },
-  "members": [
-    { "displayName": "Steven", "discordId": "123456789012345678", "role": "commissioner" },
-    { "displayName": "Jordan", "discordId": null, "role": "member" }
-  ]
-}
-```
-
-`discordId` is `null` for members who haven't signed in with Discord.
-
-### `GET /week?discordId=…&week=…`
-
-The week's games. Both query params are optional: leave out `week` for the
-current week, and leave out `discordId` to get just the games and started picks.
+Every game in a week. Leave out `week` for the current week.
 
 ```bash
-curl -H "Authorization: Bearer $PICKEM_KEY" \
-  "https://<app>/api/bot/week?discordId=123456789012345678"
+curl -H "Authorization: Bearer $PICKEM_KEY" https://<app>/api/bot/week
 ```
 
 ```json
 {
   "league": { "id": "…", "name": "Sunday Scaries", "mode": "confidence" },
   "week": 6,
-  "games": [
-    {
-      "id": "401772938",
-      "kickoff": "2026-10-11T17:00:00Z",
-      "locked": false,
-      "state": "pre",
-      "status": "10/11 - 1:00 PM EDT",
-      "away": { "abbr": "BUF", "name": "Buffalo Bills", "shortName": "Bills", "record": "4-1", "logo": "https://a.espncdn.com/…/buf.png", "score": 0 },
-      "home": { "abbr": "KC", "name": "Kansas City Chiefs", "shortName": "Chiefs", "record": "3-2", "logo": "https://a.espncdn.com/…/kc.png", "score": 0 },
-      "spread": -2.5,
-      "spreadText": "KC -2.5",
-      "publicPicks": { "home": 58, "away": 42 },
-      "myPick": { "team": "KC", "confidence": 14 },
-      "picks": []
-    }
-  ]
+  "games": [ { …a game… } ]
 }
 ```
 
-- `id` is the game id to use when picking.
-- `kickoff` is the game time in UTC (ISO 8601). In discord.js, `<t:${Math.floor(Date.parse(kickoff) / 1000)}:F>` shows it in each viewer's own time zone.
-- `record` is the team's season record, or `null` before ESPN has one.
-- `publicPicks` is the share of ESPN NFL Pick'em players picking each side (whole percentages adding to 100), or `null` when ESPN hasn't published it. Source: ESPN Pigskin Pick'em.
-- `spread` is the home team's line (negative means home is favored). In
-  against-the-spread leagues it's frozen at kickoff and that's the line scored.
-- `picks` lists other members' picks and is empty until `locked` is `true`.
+### `GET /games/{id}`, `GET /games/latest`, `GET /games/next`
 
-### `POST /picks`
+One game, in the same shape as in `/week`.
 
-Make or change one pick.
+- `/games/{id}`: by game id (the `id` from `/week`).
+- `/games/latest`: the game that kicked off most recently. Good for an `/nfl`
+  command after the deadline.
+- `/games/next`: the next game to kick off this week. Good for reminders.
 
 ```bash
-curl -X POST -H "Authorization: Bearer $PICKEM_KEY" -H "Content-Type: application/json" \
-  -d '{"discordId":"123456789012345678","gameId":"401772938","team":"KC"}' \
-  https://<app>/api/bot/picks
+curl -H "Authorization: Bearer $PICKEM_KEY" https://<app>/api/bot/games/latest
 ```
 
 ```json
-{ "gameId": "401772938", "team": "KC", "confidence": 14 }
+{ "game": { …a game… } }
 ```
 
-`team` is the team abbreviation from `/week` (case doesn't matter). Switching
-teams on a game keeps its confidence value.
+`404` with an `error` message when there's no such game (for example
+`/games/latest` before the season's first kickoff).
 
-### `POST /confidence`
-
-Set confidence values for one or more games at once. All or nothing: if any
-value fails, nothing changes. The game must already have a pick.
-
-Because values are unique per week, moving a game to a value another game
-already holds means sending both. To swap two games:
-
-```bash
-curl -X POST -H "Authorization: Bearer $PICKEM_KEY" -H "Content-Type: application/json" \
-  -d '{"discordId":"123456789012345678","values":[{"gameId":"401772938","confidence":16},{"gameId":"401772941","confidence":14}]}' \
-  https://<app>/api/bot/confidence
-```
-
-```json
-{ "ok": true, "values": [ … ] }
-```
-
-### `GET /standings`
-
-Season standings from finished games, best first.
+### A game
 
 ```json
 {
-  "standings": [
-    { "rank": 1, "displayName": "Steven", "discordId": "123…", "points": 212, "correct": 58, "byWeek": { "1": 31, "2": 40 } }
+  "id": "401772938",
+  "week": 6,
+  "kickoff": "2026-10-11T17:00:00Z",
+  "locked": true,
+  "state": "in",
+  "status": "2nd 4:12",
+  "away": { "abbr": "BUF", "name": "Buffalo Bills", "shortName": "Bills", "record": "4-1", "logo": "https://a.espncdn.com/…/buf.png", "score": 10 },
+  "home": { "abbr": "KC", "name": "Kansas City Chiefs", "shortName": "Chiefs", "record": "3-2", "logo": "https://a.espncdn.com/…/kc.png", "score": 7 },
+  "spread": -2.5,
+  "spreadText": "KC -2.5",
+  "publicPicks": { "home": 58, "away": 42 },
+  "picks": [
+    { "displayName": "Steven", "discordId": "123456789012345678", "team": "KC", "confidence": 14 },
+    { "displayName": "Nate", "discordId": "234567890123456789", "team": "BUF", "confidence": 9 }
+  ],
+  "notPicked": [
+    { "displayName": "Jordan", "discordId": null }
   ]
 }
 ```
 
+- `kickoff` is the game time in UTC. In Discord, `<t:${Math.floor(Date.parse(kickoff) / 1000)}:F>`
+  shows it in each reader's own time zone (`:R` gives "in 2 hours").
+- `locked` turns `true` at kickoff. `picks` is empty until then.
+- `state` is `pre`, `in` or `post`; `status` is ESPN's short status text
+  (like "2nd 4:12" or "Final").
+- `record` is the team's season record, or `null` before ESPN has one.
+- `spread` is the home team's line (negative means home is favored). It's
+  frozen at kickoff in against-the-spread leagues.
+- `publicPicks` is the share of ESPN NFL Pick'em players picking each side
+  (whole percentages adding to 100), or `null` when ESPN hasn't published it.
+- `confidence` is `null` unless the league uses confidence points.
+- `discordId` is the member's Discord user id once they've signed in to the app
+  with Discord, otherwise `null`. Use it to @mention: `<@${discordId}>`.
+
 ## Errors
 
-Errors are JSON: `{ "error": "message you can show the user" }`.
-
-| Status | Meaning |
-| --- | --- |
-| 400 | Bad input: wrong team, value out of range, value used twice, wrong scoring mode |
-| 401 | Missing, wrong or revoked API key |
-| 404 | Discord user not linked or not in the league, unknown game, or ranking a game with no pick |
-| 409 | Game already started, or that confidence value is already on another game |
-| 500 | Something broke on our end |
+Errors are JSON, `{ "error": "message" }`: `400` bad `week`, `401` missing,
+wrong or revoked key, `404` no such game, `500` something broke on our end.
 
 ## discord.js example
 
 ```js
 const API = "https://<app>/api/bot";
-const headers = {
-  Authorization: `Bearer ${process.env.PICKEM_KEY}`,
-  "Content-Type": "application/json",
-};
+const headers = { Authorization: `Bearer ${process.env.PICKEM_KEY}` };
+const get = (path) => fetch(`${API}${path}`, { headers }).then((r) => r.json());
+const time = (iso) => `<t:${Math.floor(Date.parse(iso) / 1000)}:R>`;
 
-// /pick game:<id> team:<abbr>
-async function pick(interaction) {
-  const res = await fetch(`${API}/picks`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      discordId: interaction.user.id,
-      gameId: interaction.options.getString("game"),
-      team: interaction.options.getString("team"),
-    }),
-  });
-  const body = await res.json();
-  await interaction.reply({
-    content: res.ok
-      ? `Locked in ${body.team}${body.confidence ? ` for ${body.confidence} points` : ""}.`
-      : body.error,
-    ephemeral: true,
-  });
+// /nfl: the latest game and everyone's picks
+async function nfl(interaction) {
+  const { game, error } = await get("/games/latest");
+  if (error) return interaction.reply(error);
+  const lines = game.picks.map(
+    (p) => `${p.displayName}: ${p.team}${p.confidence ? ` (${p.confidence})` : ""}`,
+  );
+  await interaction.reply(
+    `**${game.away.abbr} ${game.away.score} @ ${game.home.abbr} ${game.home.score}** · ${game.status}\n` +
+      (lines.join("\n") || "Nobody picked this one."),
+  );
+}
+
+// Reminder: ping whoever hasn't picked the next game
+async function remind(channel) {
+  const { game } = await get("/games/next");
+  if (!game || game.notPicked.length === 0) return;
+  const who = game.notPicked.map((m) => (m.discordId ? `<@${m.discordId}>` : m.displayName));
+  await channel.send(
+    `${game.away.abbr} @ ${game.home.abbr} kicks off ${time(game.kickoff)}. Still need picks from ${who.join(", ")}.`,
+  );
 }
 ```
-
-Reply ephemerally to pick commands so friends don't see picks before kickoff.

@@ -20,7 +20,7 @@ export function BotAccess({ leagueId }: { leagueId: string }) {
 				<span className="flex-1">
 					<span className="block font-semibold">Discord bot access</span>
 					<span className="block text-sm text-muted-foreground">
-						Let a bot make picks for members who sign in with Discord.
+						Let a Discord bot show this league's games and picks.
 					</span>
 				</span>
 				<ChevronDown
@@ -74,10 +74,9 @@ function Keys({ leagueId }: { leagueId: string }) {
 	return (
 		<div className="border-t px-4 py-4 text-sm">
 			<p className="text-muted-foreground">
-				A key works for this league only. The bot follows the same rules as the
-				app: picks lock at kickoff and friends' picks stay hidden until then.
-				Anyone holding the key can pick for any member, so only give it to a bot
-				you trust.
+				A key works for this league only and can't change anything. The bot sees
+				each game's picks once it kicks off, and who hasn't picked yet before
+				then, never what they picked.
 			</p>
 			{newKey && (
 				<div className="mt-4 rounded-md border border-primary/50 bg-primary/5 p-3">

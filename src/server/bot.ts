@@ -1,14 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ZodType } from "zod";
-import type { Game } from "#/lib/nfl/types";
+import type { Game, Team } from "#/lib/nfl/types";
 import type { ScoringMode } from "#/lib/scoring";
 import { getSupabaseAdminClient } from "#/lib/supabase.server";
 
 /**
- * Bot API: a Discord bot (or any script) holding a league's API key can read
- * the league and make picks for members who signed in with Discord. Every
- * write goes through the bot_* database functions, which apply the same
- * membership, kickoff-lock and scoring-mode rules as the app.
+ * Bot API: a read-only view of a league's games for a Discord bot (or any
+ * script) holding the league's API key. It reads with the secret key, so it
+ * applies the app's rule itself: picks stay hidden until a game kicks off.
  */
 
 export const KEY_PREFIX = "pickem_";
@@ -86,34 +84,6 @@ export async function authenticate(request: Request): Promise<BotContext> {
 	return { admin, league };
 }
 
-const DISCORD_ID = /^\d{15,21}$/;
-
-/** The league member whose linked Discord account has this user id. */
-export async function memberForDiscord(
-	{ admin, league }: BotContext,
-	discordId: string,
-) {
-	if (!DISCORD_ID.test(discordId))
-		throw new ApiError(400, "discordId must be a Discord user id (digits).");
-	const { data: userId } = await admin.rpc("discord_user", {
-		p_discord_id: discordId,
-	});
-	if (!userId)
-		throw new ApiError(
-			404,
-			"No Pick'em account is linked to that Discord user. They need to sign in to the app with Discord once.",
-		);
-	const { data: member } = await admin
-		.from("league_members")
-		.select("user_id")
-		.eq("league_id", league.id)
-		.eq("user_id", userId)
-		.maybeSingle();
-	if (!member)
-		throw new ApiError(404, "That Discord user is not in this league.");
-	return userId as string;
-}
-
 export interface BotMember {
 	userId: string;
 	displayName: string;
@@ -155,56 +125,16 @@ export interface PickRow {
 	confidence: number | null;
 }
 
-/**
- * Which picks the bot may see for a week: the asking member's own picks
- * always, everyone else's only once that game has kicked off. Mirrors the
- * "read picks" RLS policy, since the bot reads with the secret key.
- */
+/** Picks on games that have kicked off; the rest stay hidden, as in the app. */
 export function visiblePicks(
 	picks: PickRow[],
 	games: Pick<Game, "id" | "kickoff">[],
-	viewerId: string | null,
 	now = new Date(),
 ) {
 	const started = new Set(
 		games.filter((g) => new Date(g.kickoff) <= now).map((g) => g.id),
 	);
-	return picks.filter((p) => p.user_id === viewerId || started.has(p.game_id));
-}
-
-/** Turns a database error from a bot_* function into an HTTP error. */
-export function rpcError(error: { code?: string; message: string }) {
-	switch (error.code) {
-		case "42501": // kicked off
-		case "23505": // confidence value already used
-			return new ApiError(409, error.message);
-		case "P0002": // not a member, unknown game, no pick yet
-			return new ApiError(404, error.message);
-		case "22023": // wrong team, wrong scoring mode
-		case "P0001": // confidence out of range
-			return new ApiError(400, error.message);
-		default:
-			console.error("bot api rpc failed", error);
-			return new ApiError(500, "Something went wrong saving that.");
-	}
-}
-
-export async function readJson<T>(request: Request, schema: ZodType<T>) {
-	let body: unknown;
-	try {
-		body = await request.json();
-	} catch {
-		throw new ApiError(400, "Send a JSON body.");
-	}
-	const parsed = schema.safeParse(body);
-	if (!parsed.success)
-		throw new ApiError(
-			400,
-			parsed.error.issues
-				.map((i) => `${i.path.join(".") || "body"}: ${i.message}`)
-				.join("; "),
-		);
-	return parsed.data;
+	return picks.filter((p) => started.has(p.game_id));
 }
 
 /** Runs a bot endpoint: authenticates, and turns errors into JSON responses. */
@@ -222,4 +152,76 @@ export function botHandler(
 			return Response.json({ error: "Something went wrong." }, { status: 500 });
 		}
 	};
+}
+
+function teamView(t: Team, score: number) {
+	return {
+		abbr: t.abbr,
+		name: t.name,
+		shortName: t.shortName,
+		record: t.record ?? null,
+		logo: t.logo,
+		score,
+	};
+}
+
+/**
+ * Games as the bot sees them: teams, line, ESPN public %, everyone's picks
+ * once a game kicks off, and who still has to pick.
+ */
+export async function gameViews(ctx: BotContext, games: Game[]) {
+	const { admin, league } = ctx;
+	const ids = games.map((g) => g.id);
+	const [members, { data: picks }, { data: locked }] = await Promise.all([
+		leagueMembers(ctx),
+		admin
+			.from("picks")
+			.select("user_id, game_id, team, confidence")
+			.eq("league_id", league.id)
+			.in("game_id", ids),
+		admin.from("games").select("id, locked_spread").in("id", ids),
+	]);
+	const byUser = new Map(members.map((m) => [m.userId, m]));
+	const lockedSpread = new Map(
+		(locked ?? []).map((r) => [r.id, r.locked_spread as number | null]),
+	);
+	const all = (picks ?? []) as PickRow[];
+	const shown = visiblePicks(all, games);
+	const now = new Date();
+	const person = (userId: string) => ({
+		displayName: byUser.get(userId)?.displayName ?? "Player",
+		discordId: byUser.get(userId)?.discordId ?? null,
+	});
+
+	return games.map((g) => {
+		// Who has picked is fine to share before kickoff; what they picked isn't.
+		const picked = new Set(
+			all.filter((p) => p.game_id === g.id).map((p) => p.user_id),
+		);
+		return {
+			id: g.id,
+			week: g.week,
+			kickoff: g.kickoff,
+			locked: new Date(g.kickoff) <= now,
+			state: g.state,
+			status: g.statusText,
+			away: teamView(g.away, g.awayScore),
+			home: teamView(g.home, g.homeScore),
+			// Home team's line (negative = home favored); frozen at kickoff.
+			spread: lockedSpread.get(g.id) ?? g.spread,
+			spreadText: g.spreadText,
+			// Share of ESPN Pick'em players picking each side, when ESPN has it.
+			publicPicks: g.publicPicks ?? null,
+			picks: shown
+				.filter((p) => p.game_id === g.id)
+				.map((p) => ({
+					...person(p.user_id),
+					team: p.team,
+					confidence: p.confidence,
+				})),
+			notPicked: members
+				.filter((m) => !picked.has(m.userId))
+				.map((m) => person(m.userId)),
+		};
+	});
 }
