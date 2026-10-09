@@ -18,6 +18,9 @@ import { Route as JoinCodeRouteImport } from './routes/join/$code'
 import { Route as LeagueLeagueIdRouteImport } from './routes/league/$leagueId'
 import { Route as LeagueNewRouteImport } from './routes/league/new'
 import { Route as LeaguesIndexRouteImport } from './routes/leagues/index'
+import { Route as ApiBotStandingsRouteImport } from './routes/api/bot/standings'
+import { Route as ApiBotWeekRouteImport } from './routes/api/bot/week'
+import { Route as ApiBotGamesGameIdRouteImport } from './routes/api/bot/games/$gameId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +67,21 @@ const LeaguesIndexRoute = LeaguesIndexRouteImport.update({
   path: '/leagues/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBotStandingsRoute = ApiBotStandingsRouteImport.update({
+  id: '/api/bot/standings',
+  path: '/api/bot/standings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBotWeekRoute = ApiBotWeekRouteImport.update({
+  id: '/api/bot/week',
+  path: '/api/bot/week',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBotGamesGameIdRoute = ApiBotGamesGameIdRouteImport.update({
+  id: '/api/bot/games/$gameId',
+  path: '/api/bot/games/$gameId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +93,9 @@ export interface FileRoutesByFullPath {
   '/league/$leagueId': typeof LeagueLeagueIdRoute
   '/league/new': typeof LeagueNewRoute
   '/leagues/': typeof LeaguesIndexRoute
+  '/api/bot/standings': typeof ApiBotStandingsRoute
+  '/api/bot/week': typeof ApiBotWeekRoute
+  '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +107,9 @@ export interface FileRoutesByTo {
   '/league/$leagueId': typeof LeagueLeagueIdRoute
   '/league/new': typeof LeagueNewRoute
   '/leagues': typeof LeaguesIndexRoute
+  '/api/bot/standings': typeof ApiBotStandingsRoute
+  '/api/bot/week': typeof ApiBotWeekRoute
+  '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +122,9 @@ export interface FileRoutesById {
   '/league/$leagueId': typeof LeagueLeagueIdRoute
   '/league/new': typeof LeagueNewRoute
   '/leagues/': typeof LeaguesIndexRoute
+  '/api/bot/standings': typeof ApiBotStandingsRoute
+  '/api/bot/week': typeof ApiBotWeekRoute
+  '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +138,9 @@ export interface FileRouteTypes {
     | '/league/$leagueId'
     | '/league/new'
     | '/leagues/'
+    | '/api/bot/standings'
+    | '/api/bot/week'
+    | '/api/bot/games/$gameId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +152,9 @@ export interface FileRouteTypes {
     | '/league/$leagueId'
     | '/league/new'
     | '/leagues'
+    | '/api/bot/standings'
+    | '/api/bot/week'
+    | '/api/bot/games/$gameId'
   id:
     | '__root__'
     | '/'
@@ -133,6 +166,9 @@ export interface FileRouteTypes {
     | '/league/$leagueId'
     | '/league/new'
     | '/leagues/'
+    | '/api/bot/standings'
+    | '/api/bot/week'
+    | '/api/bot/games/$gameId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +181,9 @@ export interface RootRouteChildren {
   LeagueLeagueIdRoute: typeof LeagueLeagueIdRoute
   LeagueNewRoute: typeof LeagueNewRoute
   LeaguesIndexRoute: typeof LeaguesIndexRoute
+  ApiBotStandingsRoute: typeof ApiBotStandingsRoute
+  ApiBotWeekRoute: typeof ApiBotWeekRoute
+  ApiBotGamesGameIdRoute: typeof ApiBotGamesGameIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +251,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeaguesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/bot/standings': {
+      id: '/api/bot/standings'
+      path: '/api/bot/standings'
+      fullPath: '/api/bot/standings'
+      preLoaderRoute: typeof ApiBotStandingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/bot/week': {
+      id: '/api/bot/week'
+      path: '/api/bot/week'
+      fullPath: '/api/bot/week'
+      preLoaderRoute: typeof ApiBotWeekRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/bot/games/$gameId': {
+      id: '/api/bot/games/$gameId'
+      path: '/api/bot/games/$gameId'
+      fullPath: '/api/bot/games/$gameId'
+      preLoaderRoute: typeof ApiBotGamesGameIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,6 +285,9 @@ const rootRouteChildren: RootRouteChildren = {
   LeagueLeagueIdRoute: LeagueLeagueIdRoute,
   LeagueNewRoute: LeagueNewRoute,
   LeaguesIndexRoute: LeaguesIndexRoute,
+  ApiBotStandingsRoute: ApiBotStandingsRoute,
+  ApiBotWeekRoute: ApiBotWeekRoute,
+  ApiBotGamesGameIdRoute: ApiBotGamesGameIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
