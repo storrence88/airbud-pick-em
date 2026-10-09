@@ -33,19 +33,29 @@ export function GameCard({
 }: Props) {
 	const line = lineText === undefined ? game.spreadText : lineText;
 	const locked = game.state !== "pre";
+	// Once a game is final the losing side fades back so the result reads at a glance.
+	const final = game.state === "post";
+	const awayLost = final && game.awayScore < game.homeScore;
+	const homeLost = final && game.homeScore < game.awayScore;
 	return (
 		<motion.article
 			initial={{ opacity: 0, y: 16 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ type: "spring", stiffness: 260, damping: 26 }}
-			className="overflow-hidden rounded-lg border bg-card shadow-sm"
+			className={cn(
+				"overflow-hidden rounded-lg border",
+				locked
+					? "bg-card/40 bg-[repeating-linear-gradient(135deg,transparent_0_9px,color-mix(in_oklab,var(--foreground)_7%,transparent)_9px_11px)]"
+					: "bg-card shadow-sm",
+			)}
 		>
 			<div className="flex items-center justify-between px-4 pt-3 text-xs text-muted-foreground">
-				<span>{locked ? game.statusText : formatKickoff(game.kickoff)}</span>
-				<span className="flex items-center gap-1">
-					{line && <span>{line}</span>}
-					{locked && <Lock className="size-3" aria-label="Locked" />}
-				</span>
+				{locked ? (
+					<StatusPill live={game.state === "in"} text={game.statusText} />
+				) : (
+					<span>{formatKickoff(game.kickoff)}</span>
+				)}
+				{line && <span>{line}</span>}
 			</div>
 			<div className="grid grid-cols-2 gap-2 p-3">
 				<TeamButton
@@ -54,6 +64,7 @@ export function GameCard({
 					showScore={game.state !== "pre"}
 					selected={picked === game.away.abbr}
 					disabled={locked}
+					faded={awayLost || (game.state === "in" && picked !== game.away.abbr)}
 					onClick={() => onPick(game.away.abbr)}
 					label="Away"
 				/>
@@ -63,6 +74,7 @@ export function GameCard({
 					showScore={game.state !== "pre"}
 					selected={picked === game.home.abbr}
 					disabled={locked}
+					faded={homeLost || (game.state === "in" && picked !== game.home.abbr)}
 					onClick={() => onPick(game.home.abbr)}
 					label="Home"
 				/>
@@ -83,6 +95,24 @@ export function GameCard({
 			) : null}
 			{footer}
 		</motion.article>
+	);
+}
+
+/** Replaces the kickoff time once a game starts: a pulsing Live tag, or a quiet locked Final. */
+function StatusPill({ live, text }: { live: boolean; text: string }) {
+	return (
+		<span className="-my-0.5 inline-flex items-center gap-1.5 rounded-full border bg-muted/60 py-0.5 pr-2.5 pl-2 font-semibold text-foreground/80">
+			{live ? (
+				<span className="relative flex size-2">
+					<span className="absolute inline-flex size-full animate-ping rounded-full bg-loss opacity-60" />
+					<span className="relative inline-flex size-2 rounded-full bg-loss" />
+				</span>
+			) : (
+				<Lock className="size-3" aria-hidden />
+			)}
+			{text}
+			<span className="sr-only">, picks locked</span>
+		</span>
 	);
 }
 
@@ -148,6 +178,7 @@ function TeamButton({
 	showScore,
 	selected,
 	disabled,
+	faded,
 	onClick,
 	label,
 }: {
@@ -156,6 +187,7 @@ function TeamButton({
 	showScore: boolean;
 	selected: boolean;
 	disabled: boolean;
+	faded: boolean;
 	onClick: () => void;
 	label: string;
 }) {
@@ -171,8 +203,11 @@ function TeamButton({
 				"relative flex flex-col items-start gap-2 overflow-hidden rounded-md border-2 p-3 text-left transition-colors sm:flex-row sm:items-center sm:gap-3",
 				selected
 					? "border-transparent text-white"
-					: "border-border hover:border-muted-foreground/40",
-				disabled && !selected && "opacity-60",
+					: disabled
+						? "border-border/60"
+						: "border-border hover:border-muted-foreground/40",
+				disabled && "cursor-default",
+				faded && "opacity-45 saturate-[.35]",
 			)}
 		>
 			<AnimatePresence>
