@@ -5,7 +5,7 @@ import {
 	useSuspenseQuery,
 } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfidenceBoard } from "#/components/ConfidenceBoard";
@@ -401,12 +401,15 @@ function ConfidenceFooter({
 }) {
 	return (
 		<div className="flex items-center justify-between border-t px-4 py-2 text-sm">
-			<span className="text-muted-foreground">
-				{!picked
-					? "Pick a winner to rank it"
-					: locked
-						? "Confidence"
-						: "Confidence · drag to rerank"}
+			<span className="flex items-center gap-1.5 text-muted-foreground">
+				{locked && <Lock className="size-3.5" aria-hidden />}
+				{locked
+					? picked
+						? "Confidence locked in"
+						: "No pick made"
+					: picked
+						? "Confidence · drag to rerank"
+						: "Pick a winner to rank it"}
 			</span>
 			<span className="flex items-center gap-2">
 				{picked && !locked && (
