@@ -45,7 +45,7 @@ export function GameCard({
 			className={cn(
 				"overflow-hidden rounded-lg border",
 				locked
-					? "bg-card/40 bg-[repeating-linear-gradient(135deg,transparent_0_10px,color-mix(in_oklab,var(--foreground)_3%,transparent)_10px_11px)]"
+					? "bg-card/40 bg-[repeating-linear-gradient(135deg,transparent_0_9px,color-mix(in_oklab,var(--foreground)_7%,transparent)_9px_11px)]"
 					: "bg-card shadow-sm",
 			)}
 		>
