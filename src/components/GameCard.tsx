@@ -1,7 +1,7 @@
 import { Check, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
-import type { Game, Team } from "#/lib/nfl/types";
+import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
 import { cn } from "#/lib/utils";
 
 interface Props {
@@ -67,6 +67,13 @@ export function GameCard({
 					label="Home"
 				/>
 			</div>
+			{game.publicPicks && (
+				<PublicSplit
+					away={game.away}
+					home={game.home}
+					split={game.publicPicks}
+				/>
+			)}
 			{others &&
 			(others[game.away.abbr]?.length || others[game.home.abbr]?.length) ? (
 				<div className="grid grid-cols-2 gap-2 px-3 pb-3 text-xs text-muted-foreground">
@@ -76,6 +83,62 @@ export function GameCard({
 			) : null}
 			{footer}
 		</motion.article>
+	);
+}
+
+/** Share of ESPN's public players picking each side, away on the left. */
+function PublicSplit({
+	away,
+	home,
+	split,
+}: {
+	away: Team;
+	home: Team;
+	split: PublicPicks;
+}) {
+	return (
+		<div
+			className="px-3 pb-3"
+			title="Share of ESPN Pigskin Pick'em players picking each team"
+		>
+			<div className="mb-1 flex items-center justify-between text-xs tabular-nums text-muted-foreground">
+				<span>
+					<span className="font-semibold text-foreground">{split.away}%</span>{" "}
+					{away.abbr}
+				</span>
+				<span className="text-[10px] uppercase tracking-wider">Public</span>
+				<span>
+					{home.abbr}{" "}
+					<span className="font-semibold text-foreground">{split.home}%</span>
+				</span>
+			</div>
+			<div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-muted">
+				<motion.span
+					className="h-full rounded-l-full"
+					style={{ background: away.color }}
+					initial={{ width: 0 }}
+					animate={{ width: `${split.away}%` }}
+					transition={{ type: "spring", stiffness: 120, damping: 20 }}
+				/>
+				<motion.span
+					className="ml-auto h-full rounded-r-full"
+					style={{ background: home.color }}
+					initial={{ width: 0 }}
+					animate={{ width: `${split.home}%` }}
+					transition={{ type: "spring", stiffness: 120, damping: 20 }}
+				/>
+			</div>
+		</div>
+	);
+}
+
+/** Says where the public pick split comes from; renders nothing without data. */
+export function PublicPicksNote({ games }: { games: Game[] }) {
+	if (!games.some((g) => g.publicPicks)) return null;
+	return (
+		<p className="mt-6 text-center text-xs text-muted-foreground">
+			Public pick percentages are from ESPN Pigskin Pick&apos;em, not Yahoo.
+		</p>
 	);
 }
 

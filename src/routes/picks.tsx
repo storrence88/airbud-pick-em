@@ -2,7 +2,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { GameCard } from "#/components/GameCard";
+import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { weekGamesQuery } from "#/server/games";
 
 export const Route = createFileRoute("/picks")({
@@ -81,6 +81,7 @@ function PicksPage() {
 					/>
 				))}
 			</div>
+			<PublicPicksNote games={games} />
 		</main>
 	);
 }

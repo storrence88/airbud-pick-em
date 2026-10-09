@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { withPublicPicks } from "#/lib/nfl/espn-pickem";
 import { syncWeek } from "./sync";
 
 const weekInput = z.object({
@@ -9,7 +10,7 @@ const weekInput = z.object({
 
 export const getWeekGames = createServerFn({ method: "GET" })
 	.inputValidator(weekInput)
-	.handler(async ({ data }) => syncWeek(data.week));
+	.handler(async ({ data }) => withPublicPicks(await syncWeek(data.week)));
 
 export const weekGamesQuery = (week?: number) =>
 	queryOptions({
