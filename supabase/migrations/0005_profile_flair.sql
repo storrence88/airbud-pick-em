@@ -20,7 +20,7 @@ alter table profiles
   -- Discord's CDN or this project's avatars bucket, nothing else.
   add constraint avatar_url_source check (
     avatar_url like 'https://cdn.discordapp.com/%'
-    or avatar_url like 'https://%.supabase.co/storage/v1/object/public/avatars/%'
+    or avatar_url like '%/storage/v1/object/public/avatars/%'
   );
 
 -- Discord sign-ups start with their Discord avatar.

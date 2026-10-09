@@ -233,7 +233,6 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 		onMutate: async (vars) => {
 			setError("");
 			await qc.cancelQueries({ queryKey: query.queryKey });
-			const prev = qc.getQueryData(query.queryKey);
 			// One lock a week: turning one on moves it off the others.
 			updatePicks((picks) =>
 				picks.map((p) =>
@@ -246,12 +245,10 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 								: p,
 				),
 			);
-			return { prev };
 		},
-		onError: (err, _vars, ctx) => {
-			setError((err as Error).message);
-			if (ctx?.prev) qc.setQueryData(query.queryKey, ctx.prev);
-		},
+		// Refetch rather than restore a snapshot, which could undo a pick made meanwhile.
+		onError: (err) => setError((err as Error).message),
+		onSettled: () => qc.invalidateQueries({ queryKey: query.queryKey }),
 	});
 	// Your lock can't move once its game kicks off.
 	const lockInPlay = games.some(

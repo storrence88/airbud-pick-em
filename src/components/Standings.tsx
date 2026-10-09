@@ -92,7 +92,12 @@ export function Standings({ leagueId }: { leagueId: string }) {
 					);
 				})}
 			</ol>
-			<TrashTalkBoard leagueId={leagueId} members={members} />
+			{/* Keyed by week so a draft doesn't carry into the next one. */}
+			<TrashTalkBoard
+				key={`${week.trashTalk.season}-${week.trashTalk.week}`}
+				leagueId={leagueId}
+				members={members}
+			/>
 		</section>
 	);
 }

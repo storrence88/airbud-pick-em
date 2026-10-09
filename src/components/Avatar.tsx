@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { teamByAbbr } from "#/lib/nfl/teams";
 import { initials, type PublicProfile } from "#/lib/profile";
 import { accentColors } from "#/lib/team-colors";
@@ -23,12 +23,19 @@ export function Avatar({
 	className?: string;
 }) {
 	const [broken, setBroken] = useState<string | null>(null);
+	const img = useRef<HTMLImageElement>(null);
 	const team = teamByAbbr(profile.favorite_team);
 	const ring = team ? accentColors(team).accent : null;
 	const src =
 		profile.avatar_kind === "photo" && profile.avatar_url !== broken
 			? profile.avatar_url
 			: null;
+	// A server-rendered image can fail before hydration, when onError isn't
+	// listening yet; catch that case once mounted.
+	useEffect(() => {
+		const el = img.current;
+		if (src && el?.complete && el.naturalWidth === 0) setBroken(src);
+	}, [src]);
 	return (
 		<span
 			className={cn(
@@ -45,6 +52,7 @@ export function Avatar({
 		>
 			{src ? (
 				<img
+					ref={img}
 					src={src}
 					alt=""
 					className="size-full object-cover"

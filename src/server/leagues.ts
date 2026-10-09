@@ -126,8 +126,8 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 		const season = games[0]?.season ?? league.season;
 		const week = games[0]?.week ?? 0;
 		const [
-			{ data: members },
-			{ data: picks },
+			{ data: members, error: membersError },
+			{ data: picks, error: picksError },
 			{ data: talk },
 			{ data: reveal },
 		] = await Promise.all([
@@ -149,6 +149,9 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 				.eq("week", week),
 			sb.rpc("week_reveal_at", { p_season: season, p_week: week }),
 		]);
+		// An empty roster or pick list would look like lost picks, so fail loudly.
+		const failed = membersError ?? picksError;
+		if (failed) throw new Error(failed.message);
 		// Locked spreads come from our DB so ATS uses the frozen line, not the live one.
 		const { data: locked } = await sb
 			.from("games")
@@ -286,21 +289,28 @@ export const saveTrashTalk = createServerFn({ method: "POST" })
 			season: data.season,
 			week: data.week,
 		};
-		const { error } = data.body
-			? await sb.from("trash_talk").upsert({
-					...key,
-					body: data.body,
-					updated_at: new Date().toISOString(),
-				})
-			: await sb.from("trash_talk").delete().match(key);
+		const locked = "Trash talk is locked once this week's lines are out.";
+		if (!data.body) {
+			// RLS turns a late delete into a no-op rather than an error.
+			const { data: gone, error } = await sb
+				.from("trash_talk")
+				.delete()
+				.match(key)
+				.select("user_id");
+			if (error) throw new Error(error.message);
+			if (!gone?.length) throw new Error(locked);
+			return;
+		}
+		const { error } = await sb.from("trash_talk").upsert({
+			...key,
+			body: data.body,
+			updated_at: new Date().toISOString(),
+		});
 		// RLS rejects writes once the week's lines are revealed.
-		if (error)
-			throw new Error(
-				error.code === "42501"
-					? "Trash talk is locked once this week's lines are out."
-					: error.message,
-			);
+		if (error) throw new Error(error.code === "42501" ? locked : error.message);
 	});
+
+const PAGE = 1000;
 
 /** Every revealed pick on finished games this season, for the standings. */
 export const getStandingsData = createServerFn({ method: "GET" })
@@ -327,14 +337,22 @@ export const getStandingsData = createServerFn({ method: "GET" })
 		}
 		const games = (all ?? []).filter((g) => g.state === "post");
 		const ids = games.map((g) => g.id);
-		const { data: picks } = ids.length
-			? await sb
-					.from("picks")
-					.select(PICK_COLUMNS)
-					.eq("league_id", data.leagueId)
-					.in("game_id", ids)
-			: { data: [] };
-		return { games, weeks, picks: (picks ?? []) as PickRow[] };
+		// A season of picks passes Supabase's 1000-row response cap, so page through.
+		const picks: PickRow[] = [];
+		for (let from = 0; ids.length; from += PAGE) {
+			const { data: page, error } = await sb
+				.from("picks")
+				.select(PICK_COLUMNS)
+				.eq("league_id", data.leagueId)
+				.in("game_id", ids)
+				.order("game_id")
+				.order("user_id")
+				.range(from, from + PAGE - 1);
+			if (error) throw new Error(error.message);
+			picks.push(...((page ?? []) as PickRow[]));
+			if (!page || page.length < PAGE) break;
+		}
+		return { games, weeks, picks };
 	});
 
 export const standingsQuery = (leagueId: string) =>

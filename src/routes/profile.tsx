@@ -71,6 +71,9 @@ function ProfilePage() {
 		mutationFn: () => updateProfile({ data: changes }),
 		onSuccess: async () => {
 			await qc.invalidateQueries({ queryKey: ["profile"] });
+			// The server trims text, so take its copy back or the form stays "unsaved".
+			const fresh = qc.getQueryData(myProfileQuery().queryKey);
+			if (fresh) setForm(fresh.profile);
 			// Header avatar, team theme, and league rosters read the profile too.
 			qc.invalidateQueries({ queryKey: ["league"] });
 			await router.invalidate();
@@ -150,6 +153,7 @@ function ProfilePage() {
 			<Section title="Avatar">
 				<AvatarPicker
 					userId={data.userId}
+					savedUrl={data.profile.avatar_url}
 					form={form}
 					discordAvatar={data.discordAvatar}
 					onChange={(url, kind) => {
@@ -417,11 +421,13 @@ async function squareWebp(file: File, size = 256): Promise<Blob> {
 
 function AvatarPicker({
 	userId,
+	savedUrl,
 	form,
 	discordAvatar,
 	onChange,
 }: {
 	userId: string;
+	savedUrl: string | null;
 	form: MyProfile;
 	discordAvatar: string | null;
 	/** url undefined keeps the current photo. */
@@ -435,10 +441,12 @@ function AvatarPicker({
 	const [error, setError] = useState("");
 	const usingDiscord =
 		form.avatar_kind === "photo" && form.avatar_url === discordAvatar;
-	const uploaded =
+	// Remembered separately so picking Discord doesn't drop a new upload.
+	const [uploaded, setUploaded] = useState(
 		form.avatar_url && form.avatar_url !== discordAvatar
 			? form.avatar_url
-			: null;
+			: null,
+	);
 
 	async function upload(file: File) {
 		if (!supabase) return setError("Uploads aren't set up here.");
@@ -452,7 +460,17 @@ function AvatarPicker({
 				.upload(path, blob, { contentType: "image/webp" });
 			if (err) throw err;
 			const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+			setUploaded(data.publicUrl);
 			onChange(data.publicUrl, "photo");
+			// Keep only this upload and the saved one; older tries are clutter.
+			const saved = savedUrl?.split("/avatars/")[1]?.split("?")[0];
+			const { data: files } = await supabase.storage
+				.from("avatars")
+				.list(userId);
+			const stale = (files ?? [])
+				.map((f) => `${userId}/${f.name}`)
+				.filter((p) => p !== path && p !== saved);
+			if (stale.length) await supabase.storage.from("avatars").remove(stale);
 		} catch (err) {
 			setError((err as Error).message);
 		} finally {
@@ -589,16 +607,31 @@ function TeamPicker({
 								transition={{ type: "spring", stiffness: 400, damping: 32 }}
 							/>
 						)}
-						<img
-							src={teamLogo(t.abbr)}
-							alt=""
-							className="relative size-[70%] drop-shadow"
-							loading="lazy"
-						/>
+						<TeamLogo abbr={t.abbr} />
 					</motion.button>
 				);
 			})}
 		</div>
+	);
+}
+
+/** Team logo, or its abbreviation if the image can't load. */
+function TeamLogo({ abbr }: { abbr: string }) {
+	const [failed, setFailed] = useState(false);
+	if (failed)
+		return (
+			<span className="relative font-display text-sm font-semibold">
+				{abbr}
+			</span>
+		);
+	return (
+		<img
+			src={teamLogo(abbr)}
+			alt=""
+			className="relative size-[70%] drop-shadow"
+			loading="lazy"
+			onError={() => setFailed(true)}
+		/>
 	);
 }
 
