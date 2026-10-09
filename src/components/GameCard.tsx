@@ -35,7 +35,6 @@ export function GameCard({
 	const locked = game.state !== "pre";
 	return (
 		<motion.article
-			layout
 			initial={{ opacity: 0, y: 16 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ type: "spring", stiffness: 260, damping: 26 }}
@@ -106,7 +105,7 @@ function TeamButton({
 			whileTap={disabled ? undefined : { scale: 0.96 }}
 			aria-pressed={selected}
 			className={cn(
-				"relative flex items-center gap-3 overflow-hidden rounded-md border-2 p-3 text-left transition-colors",
+				"relative flex flex-col items-start gap-2 overflow-hidden rounded-md border-2 p-3 text-left transition-colors sm:flex-row sm:items-center sm:gap-3",
 				selected
 					? "border-transparent text-white"
 					: "border-border hover:border-muted-foreground/40",
@@ -127,14 +126,28 @@ function TeamButton({
 					/>
 				)}
 			</AnimatePresence>
-			{team.logo && (
-				<img
-					src={team.logo}
-					alt=""
-					className="relative size-10 shrink-0 drop-shadow"
-				/>
-			)}
-			<span className="relative min-w-0 flex-1">
+			{/* Phones stack each team (logo and score on top, name below) so two fit side by side. */}
+			<span className="relative flex w-full items-center justify-between gap-2 sm:contents">
+				{team.logo && (
+					<span className="relative shrink-0">
+						<img
+							src={team.logo}
+							alt=""
+							className="size-9 drop-shadow sm:size-10"
+						/>
+						<CheckBadge
+							show={selected}
+							className="absolute -right-2 -bottom-1.5 size-5 sm:hidden"
+						/>
+					</span>
+				)}
+				{showScore && (
+					<span className="relative font-display text-2xl font-bold tabular-nums sm:order-last">
+						{score}
+					</span>
+				)}
+			</span>
+			<span className="relative w-full min-w-0 flex-1 sm:w-auto">
 				<span className="block text-[10px] uppercase tracking-wider opacity-70">
 					{label}
 				</span>
@@ -145,23 +158,39 @@ function TeamButton({
 					<span className="block text-xs opacity-70">{team.record}</span>
 				)}
 			</span>
-			{showScore && (
-				<span className="relative font-display text-2xl font-bold tabular-nums">
-					{score}
-				</span>
-			)}
-			<AnimatePresence>
-				{selected && (
-					<motion.span
-						initial={{ scale: 0, rotate: -45 }}
-						animate={{ scale: 1, rotate: 0 }}
-						exit={{ scale: 0 }}
-						className="relative grid size-6 place-items-center rounded-full bg-white/90 text-black"
-					>
-						<Check className="size-4" strokeWidth={3} />
-					</motion.span>
+			<CheckBadge
+				show={selected}
+				className={cn(
+					"size-6 sm:order-last",
+					team.logo ? "hidden sm:grid" : "absolute top-2 right-2 sm:static",
 				)}
-			</AnimatePresence>
+			/>
 		</motion.button>
+	);
+}
+
+function CheckBadge({
+	show,
+	className,
+}: {
+	show: boolean;
+	className?: string;
+}) {
+	return (
+		<AnimatePresence>
+			{show && (
+				<motion.span
+					initial={{ scale: 0, rotate: -45 }}
+					animate={{ scale: 1, rotate: 0 }}
+					exit={{ scale: 0 }}
+					className={cn(
+						"relative grid place-items-center rounded-full bg-white/90 text-black shadow",
+						className,
+					)}
+				>
+					<Check className="size-[70%]" strokeWidth={3} />
+				</motion.span>
+			)}
+		</AnimatePresence>
 	);
 }

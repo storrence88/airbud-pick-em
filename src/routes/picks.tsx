@@ -44,13 +44,13 @@ function PicksPage() {
 	const week = games[0]?.week;
 
 	return (
-		<main className="mx-auto max-w-5xl px-4 py-8">
+		<main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
 			<div className="flex items-end justify-between gap-4">
 				<div>
 					<div className="text-xs font-semibold uppercase tracking-wider text-primary">
 						Straight up
 					</div>
-					<h1 className="font-display text-4xl font-bold uppercase">
+					<h1 className="font-display text-3xl font-bold uppercase sm:text-4xl">
 						Week {week}
 					</h1>
 				</div>
@@ -71,7 +71,7 @@ function PicksPage() {
 					transition={{ type: "spring", stiffness: 120, damping: 20 }}
 				/>
 			</div>
-			<div className="mt-6 grid gap-4 md:grid-cols-2">
+			<div className="mt-6 grid gap-3 sm:gap-4 md:grid-cols-2">
 				{games.map((g) => (
 					<GameCard
 						key={g.id}

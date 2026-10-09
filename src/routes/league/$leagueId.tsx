@@ -55,13 +55,13 @@ function LeaguePage() {
 	const { league } = data;
 
 	return (
-		<main className="mx-auto max-w-5xl px-4 py-8">
-			<div className="flex flex-wrap items-end justify-between gap-4">
-				<div>
+		<main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
+			<div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+				<div className="min-w-0">
 					<div className="text-xs font-semibold uppercase tracking-wider text-primary">
 						{SCORING_MODES[league.mode].label}
 					</div>
-					<h1 className="font-display text-4xl font-bold uppercase">
+					<h1 className="font-display text-3xl font-bold uppercase break-words sm:text-4xl">
 						{league.name}
 					</h1>
 				</div>
@@ -74,7 +74,7 @@ function LeaguePage() {
 						type="button"
 						onClick={() => setTab(t)}
 						className={cn(
-							"relative rounded-full px-4 py-1.5 capitalize transition-colors",
+							"relative h-9 rounded-full px-5 capitalize transition-colors",
 							tab === t ? "text-primary-foreground" : "text-muted-foreground",
 						)}
 					>
@@ -120,7 +120,7 @@ function InviteButton({ code }: { code: string }) {
 				setCopied(true);
 				setTimeout(() => setCopied(false), 1500);
 			}}
-			className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+			className="flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors hover:bg-muted"
 		>
 			{copied ? (
 				<Check className="size-4 text-primary" />
@@ -259,6 +259,16 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 
 	const made = games.filter((g) => mine.has(g.id)).length;
 
+	// On phones the two views swap in place; jump back to the top of the list
+	// so a switch from deep in the games doesn't land mid-board.
+	const viewsTop = useRef<HTMLDivElement>(null);
+	function switchView(v: "pick" | "rank") {
+		setView(v);
+		const el = viewsTop.current;
+		if (el && el.getBoundingClientRect().top < 0)
+			el.scrollIntoView({ behavior: "smooth", block: "start" });
+	}
+
 	return (
 		<section className="mt-6">
 			<div className="flex items-end justify-between">
@@ -281,7 +291,7 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 			</div>
 			{error && <p className="mt-3 text-sm text-loss">{error}</p>}
 			{isConfidence && (
-				<div className="relative mt-6 grid grid-cols-2 rounded-full border bg-card p-1 text-sm font-semibold lg:hidden">
+				<div className="sticky top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-20 mt-6 grid grid-cols-2 rounded-full border bg-card/90 p-1 text-sm font-semibold shadow-lg backdrop-blur-xl lg:hidden">
 					{(
 						[
 							["pick", "Pick winners"],
@@ -291,9 +301,9 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 						<button
 							key={v}
 							type="button"
-							onClick={() => setView(v)}
+							onClick={() => switchView(v)}
 							className={cn(
-								"relative rounded-full py-1.5 transition-colors",
+								"relative h-10 rounded-full transition-colors",
 								view === v
 									? "text-primary-foreground"
 									: "text-muted-foreground",
@@ -312,14 +322,16 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 				</div>
 			)}
 			<div
+				ref={viewsTop}
 				className={cn(
+					"scroll-mt-32",
 					isConfidence &&
 						"lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6",
 				)}
 			>
 				<div
 					className={cn(
-						"mt-6 grid gap-4 md:grid-cols-2",
+						"mt-6 grid gap-3 sm:gap-4 md:grid-cols-2",
 						isConfidence && "lg:grid-cols-1",
 						isConfidence && view === "rank" && "hidden lg:grid",
 					)}
@@ -351,7 +363,7 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 											value={myPick?.confidence ?? null}
 											picked={!!myPick}
 											locked={locked}
-											onRank={() => setView("rank")}
+											onRank={() => switchView("rank")}
 										/>
 									)
 								}
@@ -400,7 +412,7 @@ function ConfidenceFooter({
 					<button
 						type="button"
 						onClick={onRank}
-						className="text-xs font-semibold text-primary lg:hidden"
+						className="-my-1 rounded-full px-3 py-2 text-xs font-semibold text-primary active:bg-muted lg:hidden"
 					>
 						Rank
 					</button>
@@ -461,16 +473,18 @@ function Standings({ leagueId }: { leagueId: string }) {
 						layout
 						transition={{ type: "spring", stiffness: 300, damping: 30 }}
 						className={cn(
-							"flex items-center gap-4 rounded-lg border bg-card px-4 py-3",
+							"flex items-center gap-3 rounded-lg border bg-card px-4 py-3 sm:gap-4",
 							r.userId === week.userId && "border-primary",
 						)}
 					>
 						<span className="w-6 font-display text-xl font-bold text-muted-foreground">
 							{i + 1}
 						</span>
-						<span className="flex-1 font-semibold">{names.get(r.userId)}</span>
+						<span className="min-w-0 flex-1 truncate font-semibold">
+							{names.get(r.userId)}
+						</span>
 						{lastWeek > 0 && (
-							<span className="text-sm text-muted-foreground">
+							<span className="shrink-0 text-sm text-muted-foreground">
 								Wk {lastWeek}: {r.byWeek[lastWeek] ?? 0}
 							</span>
 						)}

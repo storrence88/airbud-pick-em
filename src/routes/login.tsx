@@ -42,7 +42,7 @@ function Login() {
 	}
 
 	return (
-		<main className="mx-auto max-w-sm px-4 py-20">
+		<main className="mx-auto max-w-sm px-4 py-12 sm:py-20">
 			<h1 className="font-display text-4xl font-bold uppercase">Sign in</h1>
 			<p className="mt-2 text-muted-foreground">
 				We'll email you a link. No password needed.
@@ -66,6 +66,9 @@ function Login() {
 					>
 						<input
 							type="email"
+							inputMode="email"
+							autoComplete="email"
+							autoCapitalize="none"
 							required
 							value={email}
 							onChange={(e) => setEmail(e.target.value)}

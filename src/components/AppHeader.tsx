@@ -6,18 +6,18 @@ export function AppHeader() {
 	const router = useRouter();
 
 	return (
-		<header className="sticky top-0 z-30 border-b bg-background/75 backdrop-blur-xl">
-			<nav className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
+		<header className="sticky top-0 z-30 border-b bg-background/75 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+			<nav className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 sm:gap-4">
 				<Link
 					to="/"
-					className="font-display text-xl font-bold tracking-wide text-foreground"
+					className="shrink-0 py-2 font-display text-xl font-bold tracking-wide text-foreground"
 				>
 					PICK<span className="text-primary">'EM</span>
 				</Link>
 				<div className="flex gap-1 text-sm font-medium">
 					<Link
 						to={user ? "/leagues" : "/picks"}
-						className="rounded-full px-3 py-1.5 text-muted-foreground transition-colors hover:text-foreground"
+						className="flex h-10 items-center rounded-full px-3 text-muted-foreground transition-colors hover:text-foreground"
 						activeProps={{ className: "bg-muted !text-foreground" }}
 					>
 						{user ? "My leagues" : "This week"}
@@ -35,7 +35,7 @@ export function AppHeader() {
 								await router.invalidate();
 								router.navigate({ to: "/" });
 							}}
-							className="rounded-full border px-3 py-1.5 font-medium transition-colors hover:bg-muted"
+							className="h-10 rounded-full border px-4 font-medium transition-colors hover:bg-muted"
 						>
 							Sign out
 						</button>
@@ -43,7 +43,7 @@ export function AppHeader() {
 				) : (
 					<Link
 						to="/login"
-						className="ml-auto rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105 active:scale-95"
+						className="ml-auto flex h-10 items-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105 active:scale-95"
 					>
 						Sign in
 					</Link>

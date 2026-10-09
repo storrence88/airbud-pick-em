@@ -64,6 +64,20 @@
   body {
     @apply min-h-full bg-background text-foreground antialiased;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* No double-tap zoom delay on taps. */
+  a,
+  button,
+  input,
+  label {
+    touch-action: manipulation;
+  }
   body {
     background-image: radial-gradient(
       1200px 600px at 50% -200px,
