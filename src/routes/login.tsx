@@ -3,14 +3,23 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { supabase } from "#/lib/supabase";
 
-export const Route = createFileRoute("/login")({ component: Login });
+export const Route = createFileRoute("/login")({
+	validateSearch: (
+		s: Record<string, unknown>,
+	): { next?: string; error?: string } => ({
+		next: typeof s.next === "string" ? s.next : undefined,
+		error: typeof s.error === "string" ? s.error : undefined,
+	}),
+	component: Login,
+});
 
 function Login() {
+	const search = Route.useSearch();
 	const [email, setEmail] = useState("");
 	const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
-		"idle",
+		search.error ? "error" : "idle",
 	);
-	const [error, setError] = useState("");
+	const [error, setError] = useState(search.error ?? "");
 
 	async function send(e: React.FormEvent) {
 		e.preventDefault();
@@ -22,7 +31,9 @@ function Login() {
 		setStatus("sending");
 		const { error } = await supabase.auth.signInWithOtp({
 			email,
-			options: { emailRedirectTo: `${window.location.origin}/picks` },
+			options: {
+				emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(search.next ?? "/leagues")}`,
+			},
 		});
 		if (error) {
 			setStatus("error");

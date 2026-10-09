@@ -1,16 +1,38 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
+import { createLeague } from "#/server/leagues";
 
-export const Route = createFileRoute("/league/new")({ component: NewLeague });
+export const Route = createFileRoute("/league/new")({
+	beforeLoad: ({ context, location }) => {
+		if (!context.user)
+			throw redirect({ to: "/login", search: { next: location.href } });
+	},
+	component: NewLeague,
+});
 
 const MODES = Object.keys(SCORING_MODES) as ScoringMode[];
 
 function NewLeague() {
 	const [name, setName] = useState("");
 	const [mode, setMode] = useState<ScoringMode>("straight");
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	const navigate = useNavigate();
+
+	async function create() {
+		setBusy(true);
+		setError("");
+		try {
+			const league = await createLeague({ data: { name, mode } });
+			navigate({ to: "/league/$leagueId", params: { leagueId: league.id } });
+		} catch (err) {
+			setError((err as Error).message);
+			setBusy(false);
+		}
+	}
 
 	return (
 		<main className="mx-auto max-w-2xl px-4 py-10">
@@ -23,6 +45,7 @@ function NewLeague() {
 			<input
 				id="league-name"
 				value={name}
+				maxLength={60}
 				onChange={(e) => setName(e.target.value)}
 				placeholder="Sunday Scaries"
 				className="mt-2 w-full rounded-md border bg-card px-4 py-3 text-lg outline-none ring-ring/40 focus:ring-4"
@@ -78,12 +101,13 @@ function NewLeague() {
 			</fieldset>
 			<button
 				type="button"
-				disabled
-				title="Available once the database is connected"
-				className="mt-8 w-full rounded-full bg-primary py-3 font-semibold text-primary-foreground opacity-50"
+				disabled={busy || !name.trim()}
+				onClick={create}
+				className="mt-8 w-full rounded-full bg-primary py-3 font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
 			>
-				Create league
+				{busy ? "Creating…" : "Create league"}
 			</button>
+			{error && <p className="mt-2 text-sm text-loss">{error}</p>}
 		</main>
 	);
 }

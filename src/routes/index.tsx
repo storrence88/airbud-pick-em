@@ -33,7 +33,7 @@ function Home() {
 				className="mt-8 flex gap-3"
 			>
 				<Link
-					to="/picks"
+					to="/leagues"
 					className="rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground transition-transform hover:scale-105 active:scale-95"
 				>
 					This week's games
