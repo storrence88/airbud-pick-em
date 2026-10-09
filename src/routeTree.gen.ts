@@ -12,7 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PicksRouteImport } from './routes/picks'
+import { Route as ApiSyncRouteImport } from './routes/api/sync'
+import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as JoinCodeRouteImport } from './routes/join/$code'
+import { Route as LeagueLeagueIdRouteImport } from './routes/league/$leagueId'
 import { Route as LeagueNewRouteImport } from './routes/league/new'
+import { Route as LeaguesIndexRouteImport } from './routes/leagues/index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,9 +34,34 @@ const PicksRoute = PicksRouteImport.update({
   path: '/picks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSyncRoute = ApiSyncRouteImport.update({
+  id: '/api/sync',
+  path: '/api/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinCodeRoute = JoinCodeRouteImport.update({
+  id: '/join/$code',
+  path: '/join/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeagueLeagueIdRoute = LeagueLeagueIdRouteImport.update({
+  id: '/league/$leagueId',
+  path: '/league/$leagueId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LeagueNewRoute = LeagueNewRouteImport.update({
   id: '/league/new',
   path: '/league/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaguesIndexRoute = LeaguesIndexRouteImport.update({
+  id: '/leagues/',
+  path: '/leagues/',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -39,34 +69,82 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
+  '/api/sync': typeof ApiSyncRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/join/$code': typeof JoinCodeRoute
+  '/league/$leagueId': typeof LeagueLeagueIdRoute
   '/league/new': typeof LeagueNewRoute
+  '/leagues/': typeof LeaguesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
+  '/api/sync': typeof ApiSyncRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/join/$code': typeof JoinCodeRoute
+  '/league/$leagueId': typeof LeagueLeagueIdRoute
   '/league/new': typeof LeagueNewRoute
+  '/leagues': typeof LeaguesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
+  '/api/sync': typeof ApiSyncRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/join/$code': typeof JoinCodeRoute
+  '/league/$leagueId': typeof LeagueLeagueIdRoute
   '/league/new': typeof LeagueNewRoute
+  '/leagues/': typeof LeaguesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/picks' | '/league/new'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/picks'
+    | '/api/sync'
+    | '/auth/callback'
+    | '/join/$code'
+    | '/league/$leagueId'
+    | '/league/new'
+    | '/leagues/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/picks' | '/league/new'
-  id: '__root__' | '/' | '/login' | '/picks' | '/league/new'
+  to:
+    | '/'
+    | '/login'
+    | '/picks'
+    | '/api/sync'
+    | '/auth/callback'
+    | '/join/$code'
+    | '/league/$leagueId'
+    | '/league/new'
+    | '/leagues'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/picks'
+    | '/api/sync'
+    | '/auth/callback'
+    | '/join/$code'
+    | '/league/$leagueId'
+    | '/league/new'
+    | '/leagues/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   PicksRoute: typeof PicksRoute
+  ApiSyncRoute: typeof ApiSyncRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  JoinCodeRoute: typeof JoinCodeRoute
+  LeagueLeagueIdRoute: typeof LeagueLeagueIdRoute
   LeagueNewRoute: typeof LeagueNewRoute
+  LeaguesIndexRoute: typeof LeaguesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -92,11 +170,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PicksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sync': {
+      id: '/api/sync'
+      path: '/api/sync'
+      fullPath: '/api/sync'
+      preLoaderRoute: typeof ApiSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join/$code': {
+      id: '/join/$code'
+      path: '/join/$code'
+      fullPath: '/join/$code'
+      preLoaderRoute: typeof JoinCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/league/$leagueId': {
+      id: '/league/$leagueId'
+      path: '/league/$leagueId'
+      fullPath: '/league/$leagueId'
+      preLoaderRoute: typeof LeagueLeagueIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/league/new': {
       id: '/league/new'
       path: '/league/new'
       fullPath: '/league/new'
       preLoaderRoute: typeof LeagueNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leagues/': {
+      id: '/leagues/'
+      path: '/leagues'
+      fullPath: '/leagues/'
+      preLoaderRoute: typeof LeaguesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -106,7 +219,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   PicksRoute: PicksRoute,
+  ApiSyncRoute: ApiSyncRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  JoinCodeRoute: JoinCodeRoute,
+  LeagueLeagueIdRoute: LeagueLeagueIdRoute,
   LeagueNewRoute: LeagueNewRoute,
+  LeaguesIndexRoute: LeaguesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

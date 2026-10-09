@@ -1,5 +1,6 @@
 import { Check, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import type { ReactNode } from "react";
 import type { Game, Team } from "#/lib/nfl/types";
 import { cn } from "#/lib/utils";
 
@@ -7,6 +8,11 @@ interface Props {
 	game: Game;
 	picked?: string;
 	onPick: (abbr: string) => void;
+	/** Line text to show, e.g. the frozen ATS spread. Defaults to the feed's line. */
+	lineText?: string | null;
+	/** Names of other members who picked each team (shown once the game locks). */
+	others?: Record<string, string[]>;
+	footer?: ReactNode;
 }
 
 function formatKickoff(iso: string) {
@@ -17,7 +23,15 @@ function formatKickoff(iso: string) {
 	});
 }
 
-export function GameCard({ game, picked, onPick }: Props) {
+export function GameCard({
+	game,
+	picked,
+	onPick,
+	lineText,
+	others,
+	footer,
+}: Props) {
+	const line = lineText === undefined ? game.spreadText : lineText;
 	const locked = game.state !== "pre";
 	return (
 		<motion.article
@@ -30,7 +44,7 @@ export function GameCard({ game, picked, onPick }: Props) {
 			<div className="flex items-center justify-between px-4 pt-3 text-xs text-muted-foreground">
 				<span>{locked ? game.statusText : formatKickoff(game.kickoff)}</span>
 				<span className="flex items-center gap-1">
-					{game.spreadText && <span>{game.spreadText}</span>}
+					{line && <span>{line}</span>}
 					{locked && <Lock className="size-3" aria-label="Locked" />}
 				</span>
 			</div>
@@ -54,6 +68,14 @@ export function GameCard({ game, picked, onPick }: Props) {
 					label="Home"
 				/>
 			</div>
+			{others &&
+			(others[game.away.abbr]?.length || others[game.home.abbr]?.length) ? (
+				<div className="grid grid-cols-2 gap-2 px-3 pb-3 text-xs text-muted-foreground">
+					<span className="truncate">{others[game.away.abbr]?.join(", ")}</span>
+					<span className="truncate">{others[game.home.abbr]?.join(", ")}</span>
+				</div>
+			) : null}
+			{footer}
 		</motion.article>
 	);
 }

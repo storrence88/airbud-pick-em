@@ -9,6 +9,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 
 import { AppHeader } from "../components/AppHeader";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import { getSessionUser } from "../server/auth";
 import appCss from "../styles.css?url";
 
 interface MyRouterContext {
@@ -16,6 +17,7 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+	beforeLoad: async () => ({ user: await getSessionUser() }),
 	head: () => ({
 		meta: [
 			{
