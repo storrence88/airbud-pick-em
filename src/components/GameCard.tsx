@@ -129,7 +129,7 @@ function PublicSplit({
 	return (
 		<div
 			className="px-3 pb-3"
-			title="Share of ESPN Pigskin Pick'em players picking each team"
+			title="Share of ESPN NFL Pick'em players picking each team"
 		>
 			<div className="mb-1 flex items-center justify-between text-xs tabular-nums text-muted-foreground">
 				<span>
@@ -167,7 +167,7 @@ export function PublicPicksNote({ games }: { games: Game[] }) {
 	if (!games.some((g) => g.publicPicks)) return null;
 	return (
 		<p className="mt-6 text-center text-xs text-muted-foreground">
-			Public pick percentages are from ESPN Pigskin Pick&apos;em, not Yahoo.
+			Public pick percentages are from ESPN NFL Pick&apos;em, not Yahoo.
 		</p>
 	);
 }

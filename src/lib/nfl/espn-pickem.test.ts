@@ -30,6 +30,36 @@ const game = (id: string, away: string, home: string): Game => ({
 describe("parsePublicPicks", () => {
 	const games = [game("401", "TB", "DAL"), game("402", "BUF", "KC")];
 
+	it("uses the standard format's counts when ESPN lists several, in any order", () => {
+		const data: PickemChallenge = {
+			propositions: [
+				{
+					mappings: [{ type: "COMPETITION_ID", value: "401" }],
+					possibleOutcomes: [
+						{
+							abbrev: "TB",
+							choiceCounters: [
+								{ scoringFormatId: 3, count: 41694 },
+								{ scoringFormatId: 1, count: 438506 },
+							],
+						},
+						{
+							abbrev: "DAL",
+							choiceCounters: [
+								{ scoringFormatId: 2, count: 2640 },
+								{ scoringFormatId: 1, count: 40680 },
+							],
+						},
+					],
+				},
+			],
+		};
+		expect(parsePublicPicks(data, games).get("401")).toEqual({
+			home: 8,
+			away: 92,
+		});
+	});
+
 	it("matches by event id and normalizes counts", () => {
 		const data: PickemChallenge = {
 			propositions: [

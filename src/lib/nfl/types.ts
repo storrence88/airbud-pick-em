@@ -25,7 +25,7 @@ export interface Game {
 	/** Home team's line: negative when home is favored. Null when no line. */
 	spread: number | null;
 	spreadText: string | null;
-	/** Share of ESPN Pigskin Pick'em players picking each side, when known. */
+	/** Share of ESPN NFL Pick'em players picking each side, when known. */
 	publicPicks?: PublicPicks | null;
 }
 
