@@ -35,8 +35,8 @@ function NewLeague() {
 	}
 
 	return (
-		<main className="mx-auto max-w-2xl px-4 py-10">
-			<h1 className="font-display text-4xl font-bold uppercase">
+		<main className="mx-auto max-w-2xl px-4 py-8 sm:py-10">
+			<h1 className="font-display text-3xl font-bold uppercase sm:text-4xl">
 				Start a league
 			</h1>
 			<label className="mt-8 block text-sm font-medium" htmlFor="league-name">
@@ -72,7 +72,7 @@ function NewLeague() {
 										: "border-border hover:border-muted-foreground/40",
 								)}
 							>
-								<div className="flex items-center justify-between">
+								<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
 									<span className="font-display text-xl font-semibold">
 										{SCORING_MODES[m].label}
 									</span>

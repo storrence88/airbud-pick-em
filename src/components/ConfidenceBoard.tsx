@@ -82,7 +82,10 @@ export function ConfidenceBoard({ games, picks, onRerank, className }: Props) {
 
 	return (
 		<section
-			className={cn("rounded-lg border bg-card p-4 shadow-sm", className)}
+			className={cn(
+				"rounded-lg border bg-card p-3 shadow-sm sm:p-4",
+				className,
+			)}
 			aria-labelledby="confidence-heading"
 		>
 			<h3
@@ -228,7 +231,7 @@ function Row({
 				type="button"
 				aria-label={`Drag ${picked.shortName} to rerank`}
 				onPointerDown={(e) => controls.start(e)}
-				className="grid h-10 w-7 shrink-0 cursor-grab touch-none place-items-center rounded text-muted-foreground hover:text-foreground active:cursor-grabbing"
+				className="grid h-11 w-8 shrink-0 cursor-grab touch-none place-items-center rounded text-muted-foreground hover:text-foreground active:cursor-grabbing"
 			>
 				<GripVertical className="size-4" />
 			</button>
@@ -249,13 +252,14 @@ function Row({
 				<img src={picked.logo} alt="" className="size-8 shrink-0" />
 			)}
 			<Matchup game={game} team={team} />
-			<div className="ml-auto flex shrink-0 flex-col">
+			{/* Side by side and thumb-sized on phones, stacked and compact on wider screens. */}
+			<div className="ml-auto flex shrink-0 sm:flex-col">
 				<button
 					type="button"
 					aria-label={`Move ${picked.shortName} up`}
 					disabled={first}
 					onClick={() => onMove(-1)}
-					className="grid h-5 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25"
+					className="grid size-9 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted disabled:opacity-25 sm:h-5 sm:w-7"
 				>
 					<ChevronUp className="size-4" />
 				</button>
@@ -264,7 +268,7 @@ function Row({
 					aria-label={`Move ${picked.shortName} down`}
 					disabled={last}
 					onClick={() => onMove(1)}
-					className="grid h-5 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25"
+					className="grid size-9 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted disabled:opacity-25 sm:h-5 sm:w-7"
 				>
 					<ChevronDown className="size-4" />
 				</button>

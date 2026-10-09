@@ -38,14 +38,14 @@ function MyLeagues() {
 	}
 
 	return (
-		<main className="mx-auto max-w-3xl px-4 py-10">
-			<div className="flex items-center justify-between">
-				<h1 className="font-display text-4xl font-bold uppercase">
+		<main className="mx-auto max-w-3xl px-4 py-8 sm:py-10">
+			<div className="flex items-center justify-between gap-3">
+				<h1 className="font-display text-3xl sm:text-4xl font-bold uppercase">
 					My leagues
 				</h1>
 				<Link
 					to="/league/new"
-					className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105 active:scale-95"
+					className="flex h-10 shrink-0 items-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105 active:scale-95"
 				>
 					New league
 				</Link>
@@ -67,10 +67,10 @@ function MyLeagues() {
 						<Link
 							to="/league/$leagueId"
 							params={{ leagueId: league.id }}
-							className="flex items-center justify-between rounded-lg border bg-card p-4 transition-colors hover:border-primary"
+							className="flex items-center justify-between gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-primary active:scale-[0.99]"
 						>
-							<span>
-								<span className="block font-display text-xl font-semibold">
+							<span className="min-w-0">
+								<span className="block truncate font-display text-xl font-semibold">
 									{league.name}
 								</span>
 								<span className="text-sm text-muted-foreground">
@@ -91,11 +91,13 @@ function MyLeagues() {
 					value={code}
 					onChange={(e) => setCode(e.target.value)}
 					placeholder="Invite code"
-					className="flex-1 rounded-md border bg-card px-4 py-2 outline-none ring-ring/40 focus:ring-4"
+					autoCapitalize="characters"
+					autoCorrect="off"
+					className="h-11 min-w-0 flex-1 rounded-md border bg-card px-4 outline-none ring-ring/40 focus:ring-4"
 				/>
 				<button
 					type="submit"
-					className="rounded-full border px-4 py-2 font-semibold transition-colors hover:bg-muted"
+					className="h-11 rounded-full border px-5 font-semibold transition-colors hover:bg-muted"
 				>
 					Join
 				</button>

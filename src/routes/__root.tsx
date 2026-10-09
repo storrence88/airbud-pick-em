@@ -6,6 +6,7 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { MotionConfig } from "motion/react";
 
 import { AppHeader } from "../components/AppHeader";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
@@ -25,7 +26,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			},
 			{
 				name: "viewport",
-				content: "width=device-width, initial-scale=1",
+				content: "width=device-width, initial-scale=1, viewport-fit=cover",
+			},
+			{
+				name: "theme-color",
+				content: "#0b0e14",
 			},
 			{
 				title: "Pick'em",
@@ -48,8 +53,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<HeadContent />
 			</head>
 			<body>
-				<AppHeader />
-				{children}
+				{/* Respect the phone's "reduce motion" setting. */}
+				<MotionConfig reducedMotion="user">
+					<AppHeader />
+					{children}
+				</MotionConfig>
 				<TanStackDevtools
 					config={{
 						position: "bottom-right",

@@ -20,12 +20,12 @@ function Home() {
 	}, [navigate]);
 
 	return (
-		<main className="mx-auto max-w-5xl px-4 py-16">
+		<main className="mx-auto max-w-5xl px-4 py-10 sm:py-16">
 			<motion.h1
 				initial={{ opacity: 0, y: 24 }}
 				animate={{ opacity: 1, y: 0 }}
 				transition={{ type: "spring", stiffness: 120, damping: 18 }}
-				className="font-display text-5xl font-bold uppercase leading-none tracking-tight sm:text-7xl"
+				className="font-display text-[2.75rem] font-bold uppercase leading-none tracking-tight sm:text-7xl"
 			>
 				Make your picks.
 				<br />
@@ -35,7 +35,7 @@ function Home() {
 				initial={{ opacity: 0 }}
 				animate={{ opacity: 1 }}
 				transition={{ delay: 0.2 }}
-				className="mt-6 max-w-xl text-lg text-muted-foreground"
+				className="mt-6 max-w-xl text-base text-muted-foreground sm:text-lg"
 			>
 				A private NFL pick'em league for you and your friends. Straight up,
 				against the spread, or confidence points.
@@ -44,22 +44,22 @@ function Home() {
 				initial={{ opacity: 0 }}
 				animate={{ opacity: 1 }}
 				transition={{ delay: 0.3 }}
-				className="mt-8 flex gap-3"
+				className="mt-8 flex flex-col gap-3 sm:flex-row"
 			>
 				<Link
 					to="/leagues"
-					className="rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground transition-transform hover:scale-105 active:scale-95"
+					className="rounded-full bg-primary px-6 py-3 text-center font-semibold text-primary-foreground transition-transform hover:scale-105 active:scale-95"
 				>
 					This week's games
 				</Link>
 				<Link
 					to="/league/new"
-					className="rounded-full border px-6 py-3 font-semibold transition-colors hover:bg-muted"
+					className="rounded-full border px-6 py-3 text-center font-semibold transition-colors hover:bg-muted"
 				>
 					Start a league
 				</Link>
 			</motion.div>
-			<div className="mt-16 grid gap-4 sm:grid-cols-3">
+			<div className="mt-12 grid gap-3 sm:mt-16 sm:grid-cols-3 sm:gap-4">
 				{(Object.keys(SCORING_MODES) as ScoringMode[]).map((mode, i) => (
 					<motion.div
 						key={mode}
