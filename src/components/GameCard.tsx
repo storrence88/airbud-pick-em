@@ -1,9 +1,10 @@
-import { Check, Lock } from "lucide-react";
+import { Check, Lock, Star } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
-import { splitColors } from "#/lib/team-colors";
+import { accentColors, splitColors } from "#/lib/team-colors";
 import { cn } from "#/lib/utils";
+import { cardEffect, type EffectKind, PickEffect } from "./PickEffect";
 
 interface Props {
 	game: Game;
@@ -14,6 +15,11 @@ interface Props {
 	/** Names of other members who picked each team (shown once the game locks). */
 	others?: Record<string, string[]>;
 	footer?: ReactNode;
+	/** Lock of the Week control for your pick in this game. */
+	lock?: { on: boolean; onToggle: () => void } | null;
+	/** A result effect to play once; cleared through onEffectDone. */
+	effect?: EffectKind | null;
+	onEffectDone?: () => void;
 }
 
 function formatKickoff(iso: string) {
@@ -31,6 +37,9 @@ export function GameCard({
 	lineText,
 	others,
 	footer,
+	lock,
+	effect,
+	onEffectDone,
 }: Props) {
 	const line = lineText === undefined ? game.spreadText : lineText;
 	const locked = game.state !== "pre";
@@ -38,13 +47,28 @@ export function GameCard({
 	const final = game.state === "post";
 	const awayLost = final && game.awayScore < game.homeScore;
 	const homeLost = final && game.homeScore < game.awayScore;
+	const pickedTeam =
+		picked === game.home.abbr
+			? game.home
+			: picked === game.away.abbr
+				? game.away
+				: null;
+	const effectColors = pickedTeam
+		? [accentColors(pickedTeam).accent, pickedTeam.altColor]
+		: [];
+	const cardFx = cardEffect(effect, effectColors[0] ?? "#ffffff");
 	return (
 		<motion.article
 			initial={{ opacity: 0, y: 16 }}
-			animate={{ opacity: 1, y: 0 }}
-			transition={{ type: "spring", stiffness: 260, damping: 26 }}
+			animate={{ opacity: 1, y: 0, x: 0, scale: 1, ...cardFx }}
+			transition={{
+				type: "spring",
+				stiffness: 260,
+				damping: 26,
+				...cardFx?.transition,
+			}}
 			className={cn(
-				"overflow-hidden rounded-lg border",
+				"relative overflow-hidden rounded-lg border",
 				locked
 					? "bg-card/40 bg-[repeating-linear-gradient(135deg,transparent_0_9px,color-mix(in_oklab,var(--foreground)_7%,transparent)_9px_11px)]"
 					: "bg-card shadow-sm",
@@ -56,7 +80,12 @@ export function GameCard({
 				) : (
 					<span>{formatKickoff(game.kickoff)}</span>
 				)}
-				{line && <span>{line}</span>}
+				<span className="flex items-center gap-2">
+					{lock && (
+						<LockToggle on={lock.on} locked={locked} onToggle={lock.onToggle} />
+					)}
+					{line && <span>{line}</span>}
+				</span>
 			</div>
 			<div className="grid grid-cols-2 gap-2 p-3">
 				<TeamButton
@@ -95,7 +124,60 @@ export function GameCard({
 				</div>
 			) : null}
 			{footer}
+			{effect && onEffectDone && (
+				<PickEffect
+					key={effect}
+					kind={effect}
+					colors={effectColors}
+					onDone={onEffectDone}
+				/>
+			)}
 		</motion.article>
+	);
+}
+
+/** Marks your pick as your Lock of the Week; read-only once the game starts. */
+function LockToggle({
+	on,
+	locked,
+	onToggle,
+}: {
+	on: boolean;
+	locked: boolean;
+	onToggle: () => void;
+}) {
+	if (locked && !on) return null;
+	const content = (
+		<>
+			<motion.span
+				key={String(on)}
+				initial={on ? { scale: 0.4, rotate: -90 } : false}
+				animate={{ scale: 1, rotate: 0 }}
+				transition={{ type: "spring", stiffness: 500, damping: 18 }}
+				className="inline-flex"
+			>
+				<Star className={cn("size-3", on && "fill-current")} aria-hidden />
+			</motion.span>
+			{on ? "Lock of the week" : "Lock"}
+		</>
+	);
+	const style = cn(
+		"-my-1 inline-flex h-7 items-center gap-1 rounded-full border px-2.5 font-semibold transition-colors",
+		on
+			? "border-amber-400/50 bg-amber-400/15 text-amber-300"
+			: "border-border text-muted-foreground hover:text-foreground",
+	);
+	if (locked) return <span className={style}>{content}</span>;
+	return (
+		<button
+			type="button"
+			onClick={onToggle}
+			aria-pressed={on}
+			title={on ? "Remove your lock" : "Make this your Lock of the Week"}
+			className={style}
+		>
+			{content}
+		</button>
 	);
 }
 

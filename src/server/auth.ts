@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { PUBLIC_PROFILE_COLUMNS, type PublicProfile } from "#/lib/profile";
 import {
 	getSupabaseServerClient,
 	isSupabaseConfigured,
@@ -8,6 +9,9 @@ export interface SessionUser {
 	id: string;
 	email: string;
 	displayName: string;
+	profile: PublicProfile;
+	/** Tint the app with the favorite team's colors. */
+	teamTheme: boolean;
 }
 
 export const getSessionUser = createServerFn({ method: "GET" }).handler(
@@ -16,16 +20,26 @@ export const getSessionUser = createServerFn({ method: "GET" }).handler(
 		const sb = getSupabaseServerClient();
 		const { data } = await sb.auth.getUser();
 		if (!data.user) return null;
-		const { data: profile } = await sb
+		const { data: row } = await sb
 			.from("profiles")
-			.select("display_name")
+			.select(`${PUBLIC_PROFILE_COLUMNS}, team_theme`)
 			.eq("id", data.user.id)
 			.maybeSingle();
+		const profile = row as (PublicProfile & { team_theme: boolean }) | null;
+		const displayName =
+			profile?.display_name ?? data.user.email?.split("@")[0] ?? "Player";
 		return {
 			id: data.user.id,
 			email: data.user.email ?? "",
-			displayName:
-				profile?.display_name ?? data.user.email?.split("@")[0] ?? "Player",
+			displayName,
+			profile: {
+				display_name: displayName,
+				avatar_url: profile?.avatar_url ?? null,
+				avatar_kind: profile?.avatar_kind ?? "photo",
+				favorite_team: profile?.favorite_team ?? null,
+				title: profile?.title ?? null,
+			},
+			teamTheme: profile?.team_theme ?? true,
 		};
 	},
 );

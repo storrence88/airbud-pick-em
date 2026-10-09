@@ -10,18 +10,20 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfidenceBoard } from "#/components/ConfidenceBoard";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
+import type { EffectKind } from "#/components/PickEffect";
+import { Standings } from "#/components/Standings";
 import { type ConfidenceChange, nextFreeValue, repair } from "#/lib/confidence";
 import type { Game } from "#/lib/nfl/types";
-import { SCORING_MODES } from "#/lib/scoring";
-import { computeStandings } from "#/lib/standings";
+import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
 import {
 	leagueWeekQuery,
 	type PickRow,
 	savePick,
 	setConfidence,
-	standingsQuery,
+	setLock,
 } from "#/server/leagues";
+import { myProfileQuery } from "#/server/profile";
 
 export const Route = createFileRoute("/league/$leagueId")({
 	beforeLoad: ({ context, location }) => {
@@ -184,6 +186,7 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 					game_id: vars.gameId,
 					team: vars.team,
 					confidence: vars.confidence,
+					is_lock: mine.get(vars.gameId)?.is_lock ?? false,
 				},
 			]);
 			return { prev };
@@ -223,6 +226,39 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 			qc.invalidateQueries({ queryKey: query.queryKey });
 		},
 	});
+
+	const lock = useMutation({
+		mutationFn: (vars: { gameId: string; on: boolean }) =>
+			setLock({ data: { leagueId, ...vars } }),
+		onMutate: async (vars) => {
+			setError("");
+			await qc.cancelQueries({ queryKey: query.queryKey });
+			const prev = qc.getQueryData(query.queryKey);
+			// One lock a week: turning one on moves it off the others.
+			updatePicks((picks) =>
+				picks.map((p) =>
+					p.user_id !== userId
+						? p
+						: p.game_id === vars.gameId
+							? { ...p, is_lock: vars.on }
+							: vars.on
+								? { ...p, is_lock: false }
+								: p,
+				),
+			);
+			return { prev };
+		},
+		onError: (err, _vars, ctx) => {
+			setError((err as Error).message);
+			if (ctx?.prev) qc.setQueryData(query.queryKey, ctx.prev);
+		},
+	});
+	// Your lock can't move once its game kicks off.
+	const lockInPlay = games.some(
+		(g) => g.state !== "pre" && mine.get(g.id)?.is_lock,
+	);
+
+	const effects = useResultEffects(leagueId, games, mine, league.mode);
 
 	function choose(g: WeekGame, team: string) {
 		let value = mine.get(g.id)?.confidence ?? null;
@@ -343,9 +379,10 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 						if (locked) {
 							for (const p of data.picks) {
 								if (p.game_id !== g.id || p.user_id === userId) continue;
+								const name = names.get(p.user_id) ?? "Player";
 								others[p.team] = [
 									...(others[p.team] ?? []),
-									names.get(p.user_id) ?? "Player",
+									p.is_lock ? `${name} ★` : name,
 								];
 							}
 						}
@@ -357,6 +394,17 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 								onPick={(team) => choose(g, team)}
 								lineText={league.mode === "spread" ? lineText(g) : g.spreadText}
 								others={others}
+								lock={
+									myPick && (!lockInPlay || myPick.is_lock)
+										? {
+												on: myPick.is_lock,
+												onToggle: () =>
+													lock.mutate({ gameId: g.id, on: !myPick.is_lock }),
+											}
+										: null
+								}
+								effect={effects.playing[g.id]}
+								onEffectDone={() => effects.done(g.id)}
 								footer={
 									isConfidence && (
 										<ConfidenceFooter
@@ -439,65 +487,68 @@ function ConfidenceFooter({
 	);
 }
 
-function Standings({ leagueId }: { leagueId: string }) {
-	const { data: week } = useSuspenseQuery(leagueWeekQuery(leagueId));
-	const { data, isLoading } = useQuery(standingsQuery(leagueId));
-	const rows = useMemo(
-		() =>
-			data
-				? computeStandings(
-						week.members.map((m) => m.user_id),
-						data.picks,
-						data.games,
-						{
-							mode: week.league.mode,
-							pushValue: week.league.settings.pushValue,
-						},
-					)
-				: [],
-		[data, week],
-	);
-	const names = new Map(week.members.map((m) => [m.user_id, m.display_name]));
-	const lastWeek =
-		data?.games.reduce((max, g) => Math.max(max, g.week), 0) ?? 0;
-
-	if (isLoading)
-		return <p className="mt-6 text-muted-foreground">Loading standings…</p>;
-	return (
-		<section className="mt-6">
-			{lastWeek === 0 && (
-				<p className="mb-4 text-sm text-muted-foreground">
-					No finished games yet. Standings fill in as games go final.
-				</p>
-			)}
-			<ol className="grid gap-2">
-				{rows.map((r, i) => (
-					<motion.li
-						key={r.userId}
-						layout
-						transition={{ type: "spring", stiffness: 300, damping: 30 }}
-						className={cn(
-							"flex items-center gap-3 rounded-lg border bg-card px-4 py-3 sm:gap-4",
-							r.userId === week.userId && "border-primary",
-						)}
-					>
-						<span className="w-6 font-display text-xl font-bold text-muted-foreground">
-							{i + 1}
-						</span>
-						<span className="min-w-0 flex-1 truncate font-semibold">
-							{names.get(r.userId)}
-						</span>
-						{lastWeek > 0 && (
-							<span className="shrink-0 text-sm text-muted-foreground">
-								Wk {lastWeek}: {r.byWeek[lastWeek] ?? 0}
-							</span>
-						)}
-						<span className="w-12 text-right font-display text-2xl font-bold tabular-nums">
-							{r.total}
-						</span>
-					</motion.li>
-				))}
-			</ol>
-		</section>
-	);
+/**
+ * Plays your chosen win or loss effect when one of your picks goes final,
+ * once per game on this device. The first visit only remembers what's
+ * already final, so opening a league doesn't replay the whole season.
+ */
+function useResultEffects(
+	leagueId: string,
+	games: WeekGame[],
+	mine: Map<string, PickRow>,
+	mode: ScoringMode,
+) {
+	const { data: me } = useQuery(myProfileQuery());
+	const [playing, setPlaying] = useState<Record<string, EffectKind>>({});
+	useEffect(() => {
+		if (!me) return;
+		const key = `pickem:results:${leagueId}`;
+		let seen: string[] | null = null;
+		try {
+			seen = JSON.parse(localStorage.getItem(key) ?? "null");
+		} catch {}
+		const finals = games.filter((g) => g.state === "post" && mine.has(g.id));
+		const fresh = seen ? finals.filter((g) => !seen.includes(g.id)) : [];
+		if (seen && !fresh.length) return;
+		try {
+			localStorage.setItem(
+				key,
+				JSON.stringify(
+					[...(seen ?? []), ...(seen ? fresh : finals).map((g) => g.id)].slice(
+						-400,
+					),
+				),
+			);
+		} catch {}
+		const next: Record<string, EffectKind> = {};
+		for (const g of fresh) {
+			const pick = mine.get(g.id);
+			if (!pick) continue;
+			const outcome = pickOutcome(
+				{ gameId: g.id, team: pick.team },
+				{
+					id: g.id,
+					homeTeam: g.home.abbr,
+					awayTeam: g.away.abbr,
+					homeScore: g.homeScore,
+					awayScore: g.awayScore,
+					final: true,
+					lockedSpread: g.lockedSpread,
+				},
+				mode,
+			);
+			const kind =
+				outcome === "win"
+					? me.profile.win_effect
+					: outcome === "loss"
+						? me.profile.loss_effect
+						: "none";
+			if (kind !== "none") next[g.id] = kind;
+		}
+		if (Object.keys(next).length) setPlaying((p) => ({ ...p, ...next }));
+	}, [leagueId, games, mine, mode, me]);
+	return {
+		playing,
+		done: (gameId: string) => setPlaying(({ [gameId]: _, ...rest }) => rest),
+	};
 }

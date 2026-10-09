@@ -118,3 +118,29 @@ export function splitColors(away: TeamColors, home: TeamColors) {
 	// split still shows.
 	return { away: a[0], home: mix(h[0], 0.5) };
 }
+
+/** Roughly the page background (oklch(0.15 0.015 260)). */
+const PAGE_BG = "#0f1218";
+/** Accent text and buttons need more contrast than a thin bar does. */
+const MIN_ACCENT_CONTRAST = 3;
+
+/**
+ * A team's color as the app accent: primary or alternate, whichever reads
+ * on the page, else primary lightened until it does. Comes with a text
+ * color for buttons filled with it.
+ */
+export function accentColors(team: TeamColors) {
+	const ok = (c: string) =>
+		toRgb(c) && contrast(c, PAGE_BG) >= MIN_ACCENT_CONTRAST;
+	let accent = [team.color, team.altColor].find(ok);
+	for (let t = 0.1; !accent && t < 1; t += 0.1) {
+		const mixed = mix(team.color, t);
+		if (ok(mixed)) accent = mixed;
+	}
+	accent ??= "#ffffff";
+	const foreground =
+		contrast(accent, PAGE_BG) >= contrast(accent, "#ffffff")
+			? PAGE_BG
+			: "#ffffff";
+	return { accent, foreground };
+}

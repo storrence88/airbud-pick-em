@@ -4,13 +4,16 @@ import {
 	createRootRouteWithContext,
 	HeadContent,
 	Scripts,
+	useRouteContext,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { MotionConfig } from "motion/react";
 
 import { AppHeader } from "../components/AppHeader";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
-import { getSessionUser } from "../server/auth";
+import { teamByAbbr } from "../lib/nfl/teams";
+import { accentColors } from "../lib/team-colors";
+import { getSessionUser, type SessionUser } from "../server/auth";
 import appCss from "../styles.css?url";
 
 interface MyRouterContext {
@@ -46,9 +49,22 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 	shellComponent: RootDocument,
 });
 
+/** Swaps the app accent for your favorite team's color when you've opted in. */
+function teamTheme(user: SessionUser | null) {
+	const team = user?.teamTheme ? teamByAbbr(user.profile.favorite_team) : null;
+	if (!team) return undefined;
+	const { accent, foreground } = accentColors(team);
+	return {
+		"--primary": accent,
+		"--ring": accent,
+		"--primary-foreground": foreground,
+	} as React.CSSProperties;
+}
+
 function RootDocument({ children }: { children: React.ReactNode }) {
+	const { user } = useRouteContext({ from: "__root__" });
 	return (
-		<html lang="en" className="dark">
+		<html lang="en" className="dark" style={teamTheme(user)}>
 			<head>
 				<HeadContent />
 			</head>

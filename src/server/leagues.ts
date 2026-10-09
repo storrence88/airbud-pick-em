@@ -1,7 +1,13 @@
 import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { WeekStatus } from "#/lib/flair";
 import { withPublicPicks } from "#/lib/nfl/espn-pickem";
+import {
+	MAX_TRASH_TALK,
+	PUBLIC_PROFILE_COLUMNS,
+	type PublicProfile,
+} from "#/lib/profile";
 import type { ScoringMode } from "#/lib/scoring";
 import { getSupabaseServerClient } from "#/lib/supabase.server";
 import { syncWeek } from "./sync";
@@ -16,10 +22,9 @@ export interface League {
 	settings: { pushValue?: number };
 }
 
-export interface Member {
+export interface Member extends PublicProfile {
 	user_id: string;
 	role: "commissioner" | "member";
-	display_name: string;
 }
 
 export interface PickRow {
@@ -27,7 +32,15 @@ export interface PickRow {
 	game_id: string;
 	team: string;
 	confidence: number | null;
+	is_lock: boolean;
 }
+
+export interface TrashTalk {
+	user_id: string;
+	body: string;
+}
+
+const PICK_COLUMNS = "user_id, game_id, team, confidence, is_lock";
 
 async function requireUser() {
 	const sb = getSupabaseServerClient();
@@ -110,16 +123,31 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 
 		const games = await withPublicPicks(await syncWeek(data.week));
 		const gameIds = games.map((g) => g.id);
-		const [{ data: members }, { data: picks }] = await Promise.all([
+		const season = games[0]?.season ?? league.season;
+		const week = games[0]?.week ?? 0;
+		const [
+			{ data: members },
+			{ data: picks },
+			{ data: talk },
+			{ data: reveal },
+		] = await Promise.all([
 			sb
 				.from("league_members")
-				.select("user_id, role, profiles(display_name)")
+				.select(`user_id, role, profiles(${PUBLIC_PROFILE_COLUMNS})`)
 				.eq("league_id", data.leagueId),
 			sb
 				.from("picks")
-				.select("user_id, game_id, team, confidence")
+				.select(PICK_COLUMNS)
 				.eq("league_id", data.leagueId)
 				.in("game_id", gameIds),
+			// Row-level security hides other members' lines until the reveal.
+			sb
+				.from("trash_talk")
+				.select("user_id, body")
+				.eq("league_id", data.leagueId)
+				.eq("season", season)
+				.eq("week", week),
+			sb.rpc("week_reveal_at", { p_season: season, p_week: week }),
 		]);
 		// Locked spreads come from our DB so ATS uses the frozen line, not the live one.
 		const { data: locked } = await sb
@@ -137,14 +165,26 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 				...g,
 				lockedSpread: lockedById[g.id] ?? null,
 			})),
-			members: (members ?? []).map((m) => ({
-				user_id: m.user_id,
-				role: m.role,
-				display_name:
-					(m.profiles as unknown as { display_name: string } | null)
-						?.display_name ?? "Player",
-			})) as Member[],
+			members: (members ?? []).map((m) => {
+				const p = m.profiles as unknown as PublicProfile | null;
+				return {
+					user_id: m.user_id,
+					role: m.role,
+					display_name: p?.display_name ?? "Player",
+					avatar_url: p?.avatar_url ?? null,
+					avatar_kind: p?.avatar_kind ?? "photo",
+					favorite_team: p?.favorite_team ?? null,
+					title: p?.title ?? null,
+				};
+			}) as Member[],
 			picks: (picks ?? []) as PickRow[],
+			trashTalk: {
+				season,
+				week,
+				/** When everyone's lines show; null until the week's games are known. */
+				revealAt: (reveal as string | null) ?? null,
+				lines: (talk ?? []) as TrashTalk[],
+			},
 		};
 	});
 
@@ -209,6 +249,59 @@ export const setConfidence = createServerFn({ method: "POST" })
 		if (error) throw new Error(error.message);
 	});
 
+/** Makes a pick your Lock of the Week (moving it off any other game), or clears it. */
+export const setLock = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			gameId: z.string(),
+			on: z.boolean(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { error } = await sb.rpc("set_lock", {
+			p_league: data.leagueId,
+			p_game: data.gameId,
+			p_on: data.on,
+		});
+		if (error) throw new Error(error.message);
+	});
+
+/** Saves this week's trash talk line, or removes it when empty. */
+export const saveTrashTalk = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			season: z.number().int(),
+			week: z.number().int().min(1),
+			body: z.string().trim().max(MAX_TRASH_TALK),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb, user } = await requireUser();
+		const key = {
+			league_id: data.leagueId,
+			user_id: user.id,
+			season: data.season,
+			week: data.week,
+		};
+		const { error } = data.body
+			? await sb.from("trash_talk").upsert({
+					...key,
+					body: data.body,
+					updated_at: new Date().toISOString(),
+				})
+			: await sb.from("trash_talk").delete().match(key);
+		// RLS rejects writes once the week's lines are revealed.
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Trash talk is locked once this week's lines are out."
+					: error.message,
+			);
+	});
+
 /** Every revealed pick on finished games this season, for the standings. */
 export const getStandingsData = createServerFn({ method: "GET" })
 	.inputValidator(z.object({ leagueId: z.string().uuid() }))
@@ -219,22 +312,29 @@ export const getStandingsData = createServerFn({ method: "GET" })
 			.select("season")
 			.eq("id", data.leagueId)
 			.single();
-		const { data: games } = await sb
+		const { data: all } = await sb
 			.from("games")
 			.select(
-				"id, week, home_team, away_team, home_score, away_score, state, locked_spread",
+				"id, week, kickoff, home_team, away_team, home_score, away_score, state, locked_spread",
 			)
-			.eq("season", league?.season ?? seasonFor())
-			.eq("state", "post");
-		const ids = (games ?? []).map((g) => g.id);
+			.eq("season", league?.season ?? seasonFor());
+		const weeks: WeekStatus = {};
+		for (const g of all ?? []) {
+			const w = weeks[g.week] ?? { total: 0, final: 0 };
+			w.total += 1;
+			if (g.state === "post") w.final += 1;
+			weeks[g.week] = w;
+		}
+		const games = (all ?? []).filter((g) => g.state === "post");
+		const ids = games.map((g) => g.id);
 		const { data: picks } = ids.length
 			? await sb
 					.from("picks")
-					.select("user_id, game_id, team, confidence")
+					.select(PICK_COLUMNS)
 					.eq("league_id", data.leagueId)
 					.in("game_id", ids)
 			: { data: [] };
-		return { games: games ?? [], picks: (picks ?? []) as PickRow[] };
+		return { games, weeks, picks: (picks ?? []) as PickRow[] };
 	});
 
 export const standingsQuery = (leagueId: string) =>

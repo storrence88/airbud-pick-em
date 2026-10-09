@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PicksRouteImport } from './routes/picks'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ApiSyncRouteImport } from './routes/api/sync'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as JoinCodeRouteImport } from './routes/join/$code'
@@ -32,6 +33,11 @@ const LoginRoute = LoginRouteImport.update({
 const PicksRoute = PicksRouteImport.update({
   id: '/picks',
   path: '/picks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSyncRoute = ApiSyncRouteImport.update({
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
+  '/profile': typeof ProfileRoute
   '/api/sync': typeof ApiSyncRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/join/$code': typeof JoinCodeRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
+  '/profile': typeof ProfileRoute
   '/api/sync': typeof ApiSyncRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/join/$code': typeof JoinCodeRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
+  '/profile': typeof ProfileRoute
   '/api/sync': typeof ApiSyncRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/join/$code': typeof JoinCodeRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/picks'
+    | '/profile'
     | '/api/sync'
     | '/auth/callback'
     | '/join/$code'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/picks'
+    | '/profile'
     | '/api/sync'
     | '/auth/callback'
     | '/join/$code'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/picks'
+    | '/profile'
     | '/api/sync'
     | '/auth/callback'
     | '/join/$code'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   PicksRoute: typeof PicksRoute
+  ProfileRoute: typeof ProfileRoute
   ApiSyncRoute: typeof ApiSyncRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   JoinCodeRoute: typeof JoinCodeRoute
@@ -168,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: '/picks'
       fullPath: '/picks'
       preLoaderRoute: typeof PicksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sync': {
@@ -219,6 +239,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   PicksRoute: PicksRoute,
+  ProfileRoute: ProfileRoute,
   ApiSyncRoute: ApiSyncRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   JoinCodeRoute: JoinCodeRoute,
