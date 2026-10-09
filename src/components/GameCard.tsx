@@ -2,6 +2,7 @@ import { Check, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
+import { splitColors } from "#/lib/team-colors";
 import { cn } from "#/lib/utils";
 
 interface Props {
@@ -126,6 +127,7 @@ function PublicSplit({
 	home: Team;
 	split: PublicPicks;
 }) {
+	const colors = splitColors(away, home);
 	return (
 		<div
 			className="px-3 pb-3"
@@ -145,14 +147,14 @@ function PublicSplit({
 			<div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-muted">
 				<motion.span
 					className="h-full rounded-l-full"
-					style={{ background: away.color }}
+					style={{ background: colors.away }}
 					initial={{ width: 0 }}
 					animate={{ width: `${split.away}%` }}
 					transition={{ type: "spring", stiffness: 120, damping: 20 }}
 				/>
 				<motion.span
 					className="ml-auto h-full rounded-r-full"
-					style={{ background: home.color }}
+					style={{ background: colors.home }}
 					initial={{ width: 0 }}
 					animate={{ width: `${split.home}%` }}
 					transition={{ type: "spring", stiffness: 120, damping: 20 }}
