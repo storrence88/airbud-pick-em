@@ -41,6 +41,7 @@ Other scripts: `npm test` (Vitest), `npm run check` (Biome), `npm run build`.
 - `src/server/`: server functions for auth, leagues, picks and the game sync
 - `supabase/migrations/`: tables, security rules, and the create/join league functions
 - `src/routes/`: home, sign in, my leagues, new league, league (picks + standings), invite links
+- `src/routes/api/bot/`: read-only JSON API for a Discord bot (games, picks after kickoff, who still needs to pick, standings); see [docs/bot-api.md](docs/bot-api.md)
 
 ## Status
 
