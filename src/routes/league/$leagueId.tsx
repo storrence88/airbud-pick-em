@@ -13,7 +13,13 @@ import { ConfidenceBoard } from "#/components/ConfidenceBoard";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import type { EffectKind } from "#/components/PickEffect";
 import { Standings } from "#/components/Standings";
-import { type ConfidenceChange, nextFreeValue, repair } from "#/lib/confidence";
+import {
+	type ConfidenceChange,
+	forfeited,
+	nextFreeValue,
+	type RankedPick,
+	settle,
+} from "#/lib/confidence";
 import type { Game } from "#/lib/nfl/types";
 import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
@@ -262,22 +268,10 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 
 	const effects = useResultEffects(leagueId, games, mine, league.mode);
 
-	function choose(g: WeekGame, team: string) {
-		let value = mine.get(g.id)?.confidence ?? null;
-		if (isConfidence && value == null)
-			value = nextFreeValue(
-				[...mine.values()].map((p) => p.confidence),
-				games.length,
-			);
-		pick.mutate({ gameId: g.id, team, confidence: value });
-	}
-
-	// Picks saved before values were unique may share a value; untangle them once.
-	const repaired = useRef(false);
-	useEffect(() => {
-		if (!isConfidence || repaired.current) return;
-		repaired.current = true;
-		const changes = repair(
+	// Games that kicked off without a pick: they score 0 and don't count against you.
+	const missed = games.filter((g) => g.state !== "pre" && !mine.has(g.id));
+	const ranked: RankedPick[] = useMemo(
+		() =>
 			games.flatMap((g) => {
 				const p = mine.get(g.id);
 				return p
@@ -290,12 +284,37 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 						]
 					: [];
 			}),
-			games.length,
-		);
-		if (changes.length) confidence.mutate(changes);
-	}, [isConfidence, games, mine, confidence]);
+		[games, mine],
+	);
+
+	function choose(g: WeekGame, team: string) {
+		let value = mine.get(g.id)?.confidence ?? null;
+		if (isConfidence && value == null)
+			value = nextFreeValue(
+				[
+					...ranked.map((p) => p.confidence),
+					...forfeited(ranked, games.length, missed.length),
+				],
+				games.length,
+			);
+		pick.mutate({ gameId: g.id, team, confidence: value });
+	}
+
+	// Untangle picks that share a value (saved before values were unique), and
+	// once a game is missed, slide the open picks up so the top value is usable.
+	// Each set of fixes is sent once, so a rejected one isn't retried forever.
+	const settled = useRef("");
+	useEffect(() => {
+		if (!isConfidence || confidence.isPending) return;
+		const changes = settle(ranked, games.length, missed.length);
+		const key = JSON.stringify(changes);
+		if (!changes.length || key === settled.current) return;
+		settled.current = key;
+		confidence.mutate(changes);
+	}, [isConfidence, ranked, games.length, missed.length, confidence]);
 
 	const made = games.filter((g) => mine.has(g.id)).length;
+	const pickable = games.length - missed.length;
 
 	// On phones the two views swap in place; jump back to the top of the list
 	// so a switch from deep in the games doesn't land mid-board.
@@ -313,16 +332,23 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 				<h2 className="font-display text-2xl font-semibold uppercase">
 					Week {games[0]?.week}
 				</h2>
-				<div className="font-display text-2xl font-bold tabular-nums">
-					{made}
-					<span className="text-muted-foreground">/{games.length}</span>
+				<div className="flex items-baseline gap-2">
+					{missed.length > 0 && (
+						<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+							{missed.length} missed
+						</span>
+					)}
+					<span className="font-display text-2xl font-bold tabular-nums">
+						{made}
+						<span className="text-muted-foreground">/{pickable}</span>
+					</span>
 				</div>
 			</div>
 			<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
 				<motion.div
 					className="h-full rounded-full bg-primary"
 					animate={{
-						width: `${games.length ? (made / games.length) * 100 : 0}%`,
+						width: `${pickable ? (made / pickable) * 100 : 0}%`,
 					}}
 					transition={{ type: "spring", stiffness: 120, damping: 20 }}
 				/>
@@ -425,6 +451,7 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 					<ConfidenceBoard
 						games={games}
 						picks={mine}
+						missed={missed.length}
 						onRerank={(changes) => confidence.mutate(changes)}
 						className={cn(
 							"mt-6 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto",
@@ -456,7 +483,7 @@ function ConfidenceFooter({
 				{locked
 					? picked
 						? "Confidence locked in"
-						: "No pick made"
+						: "Missed · scores 0"
 					: picked
 						? "Confidence · drag to rerank"
 						: "Pick a winner to rank it"}

@@ -61,13 +61,32 @@ export function move(order: string[], gameId: string, delta: -1 | 1) {
 }
 
 /**
+ * Values a missed game gives up: one per game that kicked off without a pick,
+ * taken from the bottom of what the locked picks don't already hold. Missed
+ * games score 0, so this keeps the top values open for the games still left.
+ */
+export function forfeited(
+	picks: RankedPick[],
+	gameCount: number,
+	missed: number,
+): number[] {
+	const held = new Set(picks.filter((p) => p.locked).map((p) => p.confidence));
+	const out: number[] = [];
+	for (let v = 1; v <= gameCount && out.length < missed; v++)
+		if (!held.has(v)) out.push(v);
+	return out;
+}
+
+/**
  * Fixes picks saved before values were unique: doubled-up, out-of-range or
  * missing values on open picks get the lowest free value. The first holder of
- * a value (highest-ranked) keeps it; locked picks are never touched.
+ * a value (highest-ranked) keeps it; locked picks are never touched. Values in
+ * `skip` are never handed out.
  */
 export function repair(
 	picks: RankedPick[],
 	gameCount: number,
+	skip: number[] = [],
 ): ConfidenceChange[] {
 	const used = new Set(picks.filter((p) => p.locked).map((p) => p.confidence));
 	const open = picks
@@ -79,10 +98,52 @@ export function repair(
 		if (v != null && v >= 1 && v <= gameCount && !used.has(v)) used.add(v);
 		else conflicts.push(p);
 	}
+	const taken = new Set([...used, ...skip]);
 	return conflicts.flatMap((p) => {
-		const v = nextFreeValue(used, gameCount);
+		const v = nextFreeValue(taken, gameCount);
 		if (v == null) return [];
-		used.add(v);
+		taken.add(v);
 		return [{ gameId: p.gameId, confidence: v }];
 	});
+}
+
+/**
+ * Everything the open picks need to be valid: `repair`, then any open pick
+ * sitting on a value a missed game gave up slides up, pushing the picks above
+ * it up one step until there's a gap. Order is kept, so after missing one game
+ * your surest pick still gets the top value.
+ */
+export function settle(
+	picks: RankedPick[],
+	gameCount: number,
+	missed = 0,
+): ConfidenceChange[] {
+	const lost = forfeited(picks, gameCount, missed);
+	const fixed = new Map(
+		repair(picks, gameCount, lost).map((c) => [c.gameId, c.confidence]),
+	);
+	const open = picks
+		.filter((p) => !p.locked)
+		.map((p) => ({ ...p, confidence: fixed.get(p.gameId) ?? p.confidence }))
+		.filter((p) => p.confidence != null)
+		.sort((a, b) => (a.confidence as number) - (b.confidence as number));
+	const blocked = new Set([
+		...picks.filter((p) => p.locked).map((p) => p.confidence),
+		...lost,
+	]);
+	let prev = 0;
+	for (const p of open) {
+		let v = p.confidence as number;
+		if (blocked.has(v) || v <= prev) {
+			v = prev + 1;
+			while (v <= gameCount && blocked.has(v)) v++;
+			if (v > gameCount) break;
+		}
+		fixed.set(p.gameId, v);
+		prev = v;
+	}
+	const before = new Map(picks.map((p) => [p.gameId, p.confidence]));
+	return [...fixed]
+		.filter(([id, v]) => before.get(id) !== v)
+		.map(([gameId, confidence]) => ({ gameId, confidence }));
 }
