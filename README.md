@@ -22,7 +22,7 @@ Other scripts: `npm test` (Vitest), `npm run check` (Biome), `npm run build`.
 
 ## One-time setup
 
-1. **Database:** run each file in `supabase/migrations/` in order in the Supabase SQL editor.
+1. **Database:** run each file in `supabase/migrations/` in order in the Supabase SQL editor. `0005_profile_flair.sql` also creates the public `avatars` storage bucket for uploaded profile photos.
 2. **Auth redirect:** in Supabase > Authentication > URL Configuration, set the Site URL to your Vercel URL and add `http://localhost:3000/**` and `https://<your-app>.vercel.app/**` as redirect URLs.
 3. **Vercel:** import the repo and set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `CRON_SECRET` (any random string).
 
@@ -37,6 +37,7 @@ Other scripts: `npm test` (Vitest), `npm run check` (Biome), `npm run build`.
 - `src/lib/scoring.ts`: scoring for all three modes (tested)
 - `src/lib/nfl/espn.ts`: ESPN scoreboard provider (tested)
 - `src/lib/standings.ts`: season and weekly standings (tested)
+- `src/lib/flair.ts`: standings badges, streak flame, and last-place trophy (tested)
 - `src/server/`: server functions for auth, leagues, picks and the game sync
 - `supabase/migrations/`: tables, security rules, and the create/join league functions
 - `src/routes/`: home, sign in, my leagues, new league, league (picks + standings), invite links

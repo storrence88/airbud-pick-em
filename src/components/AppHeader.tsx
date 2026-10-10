@@ -1,5 +1,6 @@
 import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
 import { signOut } from "#/server/auth";
+import { Avatar } from "./Avatar";
 
 export function AppHeader() {
 	const { user } = useRouteContext({ from: "__root__" });
@@ -24,10 +25,18 @@ export function AppHeader() {
 					</Link>
 				</div>
 				{user ? (
-					<div className="ml-auto flex items-center gap-3 text-sm">
-						<span className="hidden text-muted-foreground sm:inline">
-							{user.displayName}
-						</span>
+					<div className="ml-auto flex items-center gap-2 text-sm sm:gap-3">
+						<Link
+							to="/profile"
+							aria-label="Your profile"
+							className="flex h-10 items-center gap-2 rounded-full pr-1 pl-1 text-muted-foreground transition-colors hover:text-foreground sm:pr-3"
+							activeProps={{ className: "bg-muted !text-foreground" }}
+						>
+							<Avatar profile={user.profile} size={28} />
+							<span className="hidden max-w-40 truncate sm:inline">
+								{user.displayName}
+							</span>
+						</Link>
 						<button
 							type="button"
 							onClick={async () => {
