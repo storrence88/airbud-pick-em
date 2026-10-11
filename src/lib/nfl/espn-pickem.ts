@@ -90,7 +90,7 @@ export function parsePublicPicks(
 const cache = new Map<string, { at: number; data: PickemChallenge }>();
 const CACHE_MS = 10 * 60_000;
 
-async function fetchChallenge(season: number, week: number) {
+export async function fetchChallenge(season: number, week: number) {
 	const key = `${season}-${week}`;
 	const hit = cache.get(key);
 	if (hit && Date.now() - hit.at < CACHE_MS) return hit.data;

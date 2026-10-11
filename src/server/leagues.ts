@@ -41,6 +41,8 @@ export interface PickRow {
 	is_lock: boolean;
 	/** Monday night tiebreaker guess, only on the week's last game. */
 	tiebreaker: number | null;
+	/** The commissioner who entered this pick for the member, if they didn't. */
+	entered_by: string | null;
 }
 
 export interface TrashTalk {
@@ -48,7 +50,8 @@ export interface TrashTalk {
 	body: string;
 }
 
-const PICK_COLUMNS = "user_id, game_id, team, confidence, is_lock, tiebreaker";
+const PICK_COLUMNS =
+	"user_id, game_id, team, confidence, is_lock, tiebreaker, entered_by";
 
 async function requireUser() {
 	const sb = getSupabaseServerClient();
@@ -241,6 +244,38 @@ export const savePick = createServerFn({ method: "POST" })
 					: error.message,
 			);
 		return confidence as number | null;
+	});
+
+/**
+ * The commissioner enters a pick a member sent in, before kickoff. In confidence
+ * leagues it takes their next open value unless one is asked for. Nothing about
+ * the member's other picks comes back.
+ */
+export const enterPickFor = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			userId: z.string().uuid(),
+			gameId: z.string(),
+			team: z.string().min(2).max(4),
+			confidence: z.number().int().min(1).max(20).nullable(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { error } = await sb.rpc("enter_pick_for", {
+			p_league: data.leagueId,
+			p_user: data.userId,
+			p_game: data.gameId,
+			p_team: data.team,
+			p_confidence: data.confidence,
+		});
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Only the league commissioner can enter picks for others."
+					: error.message,
+			);
 	});
 
 /** Re-ranks picks in one transaction; the DB rejects any value used twice in a week. */
@@ -595,4 +630,21 @@ export const leaveLeague = createServerFn({ method: "POST" })
 					? "Transfer the commissioner role before leaving the league."
 					: error.message,
 			);
+	});
+
+/** Swaps the invite code for a new one. The old link stops working right away. */
+export const resetInviteCode = createServerFn({ method: "POST" })
+	.inputValidator(z.object({ leagueId: z.string().uuid() }))
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { data: code, error } = await sb.rpc("reset_invite_code", {
+			p_league: data.leagueId,
+		});
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Only the league commissioner can reset the invite link."
+					: error.message,
+			);
+		return code as string;
 	});
