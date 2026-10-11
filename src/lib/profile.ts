@@ -37,9 +37,10 @@ export interface MyProfile extends PublicProfile {
 	loss_effect: LossEffect;
 	bot_mentions: boolean;
 	reminder_style: ReminderStyle;
+	reminder_channel: "email" | "discord" | "off";
 }
 
-export const MY_PROFILE_COLUMNS = `${PUBLIC_PROFILE_COLUMNS}, team_theme, win_effect, loss_effect, bot_mentions, reminder_style`;
+export const MY_PROFILE_COLUMNS = `${PUBLIC_PROFILE_COLUMNS}, team_theme, win_effect, loss_effect, bot_mentions, reminder_style, reminder_channel`;
 
 export const MAX_NAME = 40;
 export const MAX_TITLE = 40;
