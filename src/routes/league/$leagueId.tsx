@@ -4,11 +4,10 @@ import {
 	useQueryClient,
 	useSuspenseQuery,
 } from "@tanstack/react-query";
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { Check, Copy, Lock } from "lucide-react";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { Check, Copy, Lock, Settings } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BotAccess } from "#/components/BotAccess";
 import { ConfidenceBoard } from "#/components/ConfidenceBoard";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import type { EffectKind } from "#/components/PickEffect";
@@ -77,7 +76,20 @@ function LeaguePage() {
 						{league.name}
 					</h1>
 				</div>
-				<InviteButton code={league.invite_code} />
+				<div className="flex items-center gap-2">
+					<InviteButton code={league.invite_code} />
+					{isCommissioner && (
+						<Link
+							to="/league/$leagueId/settings"
+							params={{ leagueId }}
+							aria-label="League settings"
+							title="League settings"
+							className="grid size-10 place-items-center rounded-full border transition-colors hover:bg-muted"
+						>
+							<Settings className="size-4" aria-hidden />
+						</Link>
+					)}
+				</div>
 			</div>
 			<div className="relative mt-6 inline-flex rounded-full border bg-card p-1 text-sm font-semibold">
 				{(["picks", "standings"] as const).map((t) => (
@@ -116,7 +128,6 @@ function LeaguePage() {
 					)}
 				</motion.div>
 			</AnimatePresence>
-			{isCommissioner && <BotAccess leagueId={leagueId} />}
 		</main>
 	);
 }

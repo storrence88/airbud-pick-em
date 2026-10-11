@@ -21,6 +21,7 @@ import { Route as LeagueNewRouteImport } from './routes/league/new'
 import { Route as LeaguesIndexRouteImport } from './routes/leagues/index'
 import { Route as ApiBotStandingsRouteImport } from './routes/api/bot/standings'
 import { Route as ApiBotWeekRouteImport } from './routes/api/bot/week'
+import { Route as LeagueLeagueIdSettingsRouteImport } from './routes/league/$leagueId_.settings'
 import { Route as ApiBotGamesGameIdRouteImport } from './routes/api/bot/games/$gameId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -83,6 +84,11 @@ const ApiBotWeekRoute = ApiBotWeekRouteImport.update({
   path: '/api/bot/week',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LeagueLeagueIdSettingsRoute = LeagueLeagueIdSettingsRouteImport.update({
+  id: '/league/$leagueId_/settings',
+  path: '/league/$leagueId/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBotGamesGameIdRoute = ApiBotGamesGameIdRouteImport.update({
   id: '/api/bot/games/$gameId',
   path: '/api/bot/games/$gameId',
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/leagues/': typeof LeaguesIndexRoute
   '/api/bot/standings': typeof ApiBotStandingsRoute
   '/api/bot/week': typeof ApiBotWeekRoute
+  '/league/$leagueId/settings': typeof LeagueLeagueIdSettingsRoute
   '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
 }
 export interface FileRoutesByTo {
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/leagues': typeof LeaguesIndexRoute
   '/api/bot/standings': typeof ApiBotStandingsRoute
   '/api/bot/week': typeof ApiBotWeekRoute
+  '/league/$leagueId/settings': typeof LeagueLeagueIdSettingsRoute
   '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
 }
 export interface FileRoutesById {
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/leagues/': typeof LeaguesIndexRoute
   '/api/bot/standings': typeof ApiBotStandingsRoute
   '/api/bot/week': typeof ApiBotWeekRoute
+  '/league/$leagueId_/settings': typeof LeagueLeagueIdSettingsRoute
   '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
 }
 export interface FileRouteTypes {
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/leagues/'
     | '/api/bot/standings'
     | '/api/bot/week'
+    | '/league/$leagueId/settings'
     | '/api/bot/games/$gameId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/leagues'
     | '/api/bot/standings'
     | '/api/bot/week'
+    | '/league/$leagueId/settings'
     | '/api/bot/games/$gameId'
   id:
     | '__root__'
@@ -180,6 +191,7 @@ export interface FileRouteTypes {
     | '/leagues/'
     | '/api/bot/standings'
     | '/api/bot/week'
+    | '/league/$leagueId_/settings'
     | '/api/bot/games/$gameId'
   fileRoutesById: FileRoutesById
 }
@@ -196,6 +208,7 @@ export interface RootRouteChildren {
   LeaguesIndexRoute: typeof LeaguesIndexRoute
   ApiBotStandingsRoute: typeof ApiBotStandingsRoute
   ApiBotWeekRoute: typeof ApiBotWeekRoute
+  LeagueLeagueIdSettingsRoute: typeof LeagueLeagueIdSettingsRoute
   ApiBotGamesGameIdRoute: typeof ApiBotGamesGameIdRoute
 }
 
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBotWeekRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/league/$leagueId_/settings': {
+      id: '/league/$leagueId_/settings'
+      path: '/league/$leagueId/settings'
+      fullPath: '/league/$leagueId/settings'
+      preLoaderRoute: typeof LeagueLeagueIdSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/bot/games/$gameId': {
       id: '/api/bot/games/$gameId'
       path: '/api/bot/games/$gameId'
@@ -308,17 +328,9 @@ const rootRouteChildren: RootRouteChildren = {
   LeaguesIndexRoute: LeaguesIndexRoute,
   ApiBotStandingsRoute: ApiBotStandingsRoute,
   ApiBotWeekRoute: ApiBotWeekRoute,
+  LeagueLeagueIdSettingsRoute: LeagueLeagueIdSettingsRoute,
   ApiBotGamesGameIdRoute: ApiBotGamesGameIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
