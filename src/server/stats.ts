@@ -2,68 +2,11 @@ import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { WeekStatus } from "#/lib/flair";
-import { fetchChallenge, parsePublicPicks } from "#/lib/nfl/espn-pickem";
-import type { Game } from "#/lib/nfl/types";
 import type { StatsGame, StatsPick } from "#/lib/player-stats";
 import { PUBLIC_PROFILE_COLUMNS, type PublicProfile } from "#/lib/profile";
 import type { ScoringMode } from "#/lib/scoring";
-import {
-	getSupabaseAdminClient,
-	getSupabaseServerClient,
-} from "#/lib/supabase.server";
-
-type GameRow = StatsGame & { season: number; state: string };
-
-/**
- * Fills in the ESPN crowd split for finished games that don't have one yet.
- * ESPN keeps each week's locked split after the games end, so earlier weeks
- * backfill the first time anyone opens stats. Best effort: on any failure the
- * games just don't count toward the crowd comparison.
- */
-export async function backfillCrowd(games: GameRow[]) {
-	const admin = getSupabaseAdminClient();
-	// Before migration 0018 the column doesn't exist, so there's nothing to fill.
-	if (!admin || !games.length || !("crowd_home_pct" in games[0])) return;
-	const missing = new Map<string, GameRow[]>();
-	for (const g of games) {
-		if (g.crowd_home_pct != null) continue;
-		const key = `${g.season}-${g.week}`;
-		missing.set(key, [...(missing.get(key) ?? []), g]);
-	}
-	await Promise.all(
-		[...missing.values()].map(async (week) => {
-			try {
-				const { season, week: w } = week[0];
-				const splits = parsePublicPicks(
-					await fetchChallenge(season, w),
-					// The parser only reads the id and the two abbreviations.
-					week.map(
-						(g) =>
-							({
-								id: g.id,
-								home: { abbr: g.home_team },
-								away: { abbr: g.away_team },
-							}) as Game,
-					),
-				);
-				await Promise.all(
-					week.map(async (g) => {
-						const split = splits.get(g.id);
-						if (!split) return;
-						const { error } = await admin
-							.from("games")
-							.update({ crowd_home_pct: split.home })
-							.eq("id", g.id)
-							.is("crowd_home_pct", null);
-						if (!error) g.crowd_home_pct = split.home;
-					}),
-				);
-			} catch (err) {
-				console.warn("crowd split backfill failed", err);
-			}
-		}),
-	);
-}
+import { getSupabaseServerClient } from "#/lib/supabase.server";
+import { backfillCrowd, type CrowdGameRow } from "./crowd";
 
 export interface StatsPlayer extends PublicProfile {
 	user_id: string;
@@ -105,7 +48,9 @@ export const getPlayerStats = createServerFn({ method: "GET" })
 			if (g.state === "post") w.final += 1;
 			weeks[g.week] = w;
 		}
-		const games = ((all ?? []) as GameRow[]).filter((g) => g.state === "post");
+		const games = ((all ?? []) as CrowdGameRow[]).filter(
+			(g) => g.state === "post",
+		);
 
 		// Row-level security only returns other players' picks after kickoff.
 		const [{ data: picks, error: picksError }] = await Promise.all([
