@@ -8,6 +8,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
 import { BotAccess } from "#/components/BotAccess";
+import { TransferCommissioner } from "#/components/TransferCommissioner";
 import { SCORING_MODES } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
 import {
@@ -38,7 +39,7 @@ const PUSH_LABELS: Record<PushValue, string> = { 0: "0", 0.5: "½", 1: "1" };
 function LeagueSettings() {
 	const { leagueId } = Route.useParams();
 	const { data } = useSuspenseQuery(leagueSettingsQuery(leagueId));
-	const { league, isCommissioner } = data;
+	const { league, isCommissioner, members, userId } = data;
 
 	return (
 		<main className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
@@ -57,6 +58,11 @@ function LeagueSettings() {
 				<>
 					<SettingsForm key={league.id} />
 					<BotAccess leagueId={leagueId} />
+					<TransferCommissioner
+						leagueId={leagueId}
+						members={members}
+						userId={userId}
+					/>
 				</>
 			) : (
 				<p className="mt-6 rounded-lg border bg-card px-4 py-3 text-muted-foreground">

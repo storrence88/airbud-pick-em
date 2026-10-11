@@ -49,6 +49,22 @@ async function requireUser() {
 	return { sb, user: data.user };
 }
 
+const MEMBER_COLUMNS = `user_id, role, profiles(${PUBLIC_PROFILE_COLUMNS})`;
+
+/** A league_members row joined with its profile, as selected by MEMBER_COLUMNS. */
+function toMember(m: { user_id: string; role: string; profiles: unknown }) {
+	const p = m.profiles as PublicProfile | null;
+	return {
+		user_id: m.user_id,
+		role: m.role,
+		display_name: p?.display_name ?? "Player",
+		avatar_url: p?.avatar_url ?? null,
+		avatar_kind: p?.avatar_kind ?? "photo",
+		favorite_team: p?.favorite_team ?? null,
+		title: p?.title ?? null,
+	} as Member;
+}
+
 /** The NFL season a date falls in (seasons start in September). */
 export function seasonFor(date = new Date()) {
 	return date.getUTCMonth() < 2
@@ -133,7 +149,7 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 		] = await Promise.all([
 			sb
 				.from("league_members")
-				.select(`user_id, role, profiles(${PUBLIC_PROFILE_COLUMNS})`)
+				.select(MEMBER_COLUMNS)
 				.eq("league_id", data.leagueId),
 			sb
 				.from("picks")
@@ -168,18 +184,7 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 				...g,
 				lockedSpread: lockedById[g.id] ?? null,
 			})),
-			members: (members ?? []).map((m) => {
-				const p = m.profiles as unknown as PublicProfile | null;
-				return {
-					user_id: m.user_id,
-					role: m.role,
-					display_name: p?.display_name ?? "Player",
-					avatar_url: p?.avatar_url ?? null,
-					avatar_kind: p?.avatar_kind ?? "photo",
-					favorite_team: p?.favorite_team ?? null,
-					title: p?.title ?? null,
-				};
-			}) as Member[],
+			members: (members ?? []).map(toMember),
 			picks: (picks ?? []) as PickRow[],
 			trashTalk: {
 				season,
@@ -368,19 +373,23 @@ export const getLeagueSettings = createServerFn({ method: "GET" })
 	.inputValidator(z.object({ leagueId: z.string().uuid() }))
 	.handler(async ({ data }) => {
 		const { sb, user } = await requireUser();
-		const [{ data: league, error }, { data: me }] = await Promise.all([
-			sb.from("leagues").select("*").eq("id", data.leagueId).maybeSingle(),
-			sb
-				.from("league_members")
-				.select("role")
-				.eq("league_id", data.leagueId)
-				.eq("user_id", user.id)
-				.maybeSingle(),
-		]);
-		if (error) throw new Error(error.message);
+		const [{ data: league, error }, { data: roster, error: rosterError }] =
+			await Promise.all([
+				sb.from("leagues").select("*").eq("id", data.leagueId).maybeSingle(),
+				sb
+					.from("league_members")
+					.select(MEMBER_COLUMNS)
+					.eq("league_id", data.leagueId)
+					.order("joined_at"),
+			]);
+		if (error ?? rosterError) throw new Error((error ?? rosterError)?.message);
 		if (!league) throw new Error("League not found, or you are not a member.");
+		const members = (roster ?? []).map(toMember);
+		const me = members.find((m) => m.user_id === user.id);
 		return {
+			userId: user.id,
 			league: league as League,
+			members,
 			isCommissioner: me?.role === "commissioner",
 		};
 	});
@@ -414,4 +423,26 @@ export const updateLeagueSettings = createServerFn({ method: "POST" })
 					: error.message,
 			);
 		return league as League;
+	});
+
+/** Hands the commissioner role to another member; you become a regular member. */
+export const transferCommissioner = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			userId: z.string().uuid(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { error } = await sb.rpc("transfer_commissioner", {
+			p_league: data.leagueId,
+			p_new_commissioner: data.userId,
+		});
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Only the league commissioner can transfer the role."
+					: error.message,
+			);
 	});
