@@ -536,3 +536,20 @@ export const leaveLeague = createServerFn({ method: "POST" })
 					: error.message,
 			);
 	});
+
+/** Swaps the invite code for a new one. The old link stops working right away. */
+export const resetInviteCode = createServerFn({ method: "POST" })
+	.inputValidator(z.object({ leagueId: z.string().uuid() }))
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { data: code, error } = await sb.rpc("reset_invite_code", {
+			p_league: data.leagueId,
+		});
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Only the league commissioner can reset the invite link."
+					: error.message,
+			);
+		return code as string;
+	});
