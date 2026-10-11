@@ -10,6 +10,7 @@ import {
 } from "#/lib/profile";
 import type { ScoringMode } from "#/lib/scoring";
 import { getSupabaseServerClient } from "#/lib/supabase.server";
+import { MAX_TIEBREAKER, tiebreakerGameId } from "#/lib/tiebreaker";
 import { syncWeek } from "./sync";
 
 export interface League {
@@ -38,6 +39,10 @@ export interface PickRow {
 	team: string;
 	confidence: number | null;
 	is_lock: boolean;
+	/** Monday night tiebreaker guess, only on the week's last game. */
+	tiebreaker: number | null;
+	/** The commissioner who entered this pick for the member, if they didn't. */
+	entered_by: string | null;
 }
 
 export interface TrashTalk {
@@ -45,7 +50,8 @@ export interface TrashTalk {
 	body: string;
 }
 
-const PICK_COLUMNS = "user_id, game_id, team, confidence, is_lock";
+const PICK_COLUMNS =
+	"user_id, game_id, team, confidence, is_lock, tiebreaker, entered_by";
 
 async function requireUser() {
 	const sb = getSupabaseServerClient();
@@ -246,6 +252,38 @@ export const savePick = createServerFn({ method: "POST" })
 		return confidence as number | null;
 	});
 
+/**
+ * The commissioner enters a pick a member sent in, before kickoff. In confidence
+ * leagues it takes their next open value unless one is asked for. Nothing about
+ * the member's other picks comes back.
+ */
+export const enterPickFor = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			userId: z.string().uuid(),
+			gameId: z.string(),
+			team: z.string().min(2).max(4),
+			confidence: z.number().int().min(1).max(20).nullable(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { error } = await sb.rpc("enter_pick_for", {
+			p_league: data.leagueId,
+			p_user: data.userId,
+			p_game: data.gameId,
+			p_team: data.team,
+			p_confidence: data.confidence,
+		});
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Only the league commissioner can enter picks for others."
+					: error.message,
+			);
+	});
+
 /** Re-ranks picks in one transaction; the DB rejects any value used twice in a week. */
 export const setConfidence = createServerFn({ method: "POST" })
 	.inputValidator(
@@ -291,6 +329,63 @@ export const setLock = createServerFn({ method: "POST" })
 			p_on: data.on,
 		});
 		if (error) throw new Error(error.message);
+	});
+
+/**
+ * Saves (or clears) your Monday night tiebreaker guess: total points in the
+ * week's last game. It lives on your pick for that game, so pick a winner
+ * there first; RLS locks it at that game's kickoff.
+ */
+export const setTiebreaker = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			gameId: z.string(),
+			points: z.number().int().min(0).max(MAX_TIEBREAKER).nullable(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb, user } = await requireUser();
+		const { data: game } = await sb
+			.from("games")
+			.select("season, week")
+			.eq("id", data.gameId)
+			.maybeSingle();
+		if (!game) throw new Error("Game not found.");
+		const { data: week } = await sb
+			.from("games")
+			.select("id, kickoff")
+			.eq("season", game.season)
+			.eq("week", game.week);
+		const weekGames = week ?? [];
+		if (tiebreakerGameId(weekGames) !== data.gameId)
+			throw new Error("The tiebreaker is on the week's last game.");
+		const kickoff = weekGames.find((g) => g.id === data.gameId)?.kickoff;
+		if (kickoff && Date.parse(kickoff) <= Date.now())
+			throw new Error("That game has already started.");
+		const { data: saved, error } = await sb
+			.from("picks")
+			.update({ tiebreaker: data.points, updated_at: new Date().toISOString() })
+			.match({
+				league_id: data.leagueId,
+				user_id: user.id,
+				game_id: data.gameId,
+			})
+			.select("game_id");
+		if (error) throw new Error(error.message);
+		if (!saved?.length) throw new Error("Pick a winner in that game first.");
+		// A guess left on a game that's no longer last (schedule change) shouldn't linger.
+		const others = weekGames
+			.filter((g) => g.id !== data.gameId && Date.parse(g.kickoff) > Date.now())
+			.map((g) => g.id);
+		if (others.length)
+			await sb
+				.from("picks")
+				.update({ tiebreaker: null })
+				.eq("league_id", data.leagueId)
+				.eq("user_id", user.id)
+				.in("game_id", others)
+				.not("tiebreaker", "is", null);
 	});
 
 /** Saves this week's trash talk line, or removes it when empty. */
@@ -549,4 +644,21 @@ export const leaveLeague = createServerFn({ method: "POST" })
 					? "Transfer the commissioner role before leaving the league."
 					: error.message,
 			);
+	});
+
+/** Swaps the invite code for a new one. The old link stops working right away. */
+export const resetInviteCode = createServerFn({ method: "POST" })
+	.inputValidator(z.object({ leagueId: z.string().uuid() }))
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { data: code, error } = await sb.rpc("reset_invite_code", {
+			p_league: data.leagueId,
+		});
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Only the league commissioner can reset the invite link."
+					: error.message,
+			);
+		return code as string;
 	});

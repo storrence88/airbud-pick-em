@@ -4,13 +4,9 @@ import { useMemo } from "react";
 import type { Game, Team } from "#/lib/nfl/types";
 import type { PublicProfile } from "#/lib/profile";
 import type { ScoringSettings } from "#/lib/scoring";
+import { weekWinners } from "#/lib/tiebreaker";
 import { cn } from "#/lib/utils";
-import {
-	type WeekCell,
-	type WeekPick,
-	weekResults,
-	weekWinners,
-} from "#/lib/week-results";
+import { type WeekCell, type WeekPick, weekResults } from "#/lib/week-results";
 import { Avatar } from "./Avatar";
 
 type Player = PublicProfile & { user_id: string };
@@ -67,7 +63,8 @@ export function WeekResults({
 	);
 	const players = new Map([...members, ...formers].map((p) => [p.user_id, p]));
 	const done = games.length > 0 && games.every((g) => g.state === "post");
-	const winners = weekWinners(rows, done);
+	// Same rule as the weekly winner everywhere else: points, then the tiebreaker.
+	const winners = new Set(done ? weekWinners(rows) : []);
 	const showConfidence = settings.mode === "confidence";
 
 	return (

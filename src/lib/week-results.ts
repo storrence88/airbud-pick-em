@@ -6,6 +6,7 @@ import {
 	type ScoringSettings,
 	scorePick,
 } from "./scoring";
+import { rankWeek, tiebreakerMisses } from "./tiebreaker";
 
 export interface WeekPick {
 	user_id: string;
@@ -13,6 +14,7 @@ export interface WeekPick {
 	team: string;
 	confidence: number | null;
 	is_lock: boolean;
+	tiebreaker?: number | null;
 }
 
 export interface WeekCell {
@@ -31,6 +33,10 @@ export interface WeekResultRow {
 	wins: number;
 	losses: number;
 	pushes: number;
+	/** Monday night tiebreaker miss, once that game is final. */
+	miss: number | null;
+	/** 1 for the week's winner; shared when still tied after the tiebreaker. */
+	place: number;
 }
 
 export function toResult(
@@ -47,7 +53,10 @@ export function toResult(
 	};
 }
 
-/** Every player's picks for one week with how each one went, best week first. */
+/**
+ * Every player's picks for one week with how each one went, ranked like the
+ * rest of the app: points, then the Monday night tiebreaker.
+ */
 export function weekResults(
 	userIds: string[],
 	picks: WeekPick[],
@@ -58,7 +67,16 @@ export function weekResults(
 	const rows = new Map<string, WeekResultRow>(
 		userIds.map((id) => [
 			id,
-			{ userId: id, cells: {}, points: 0, wins: 0, losses: 0, pushes: 0 },
+			{
+				userId: id,
+				cells: {},
+				points: 0,
+				wins: 0,
+				losses: 0,
+				pushes: 0,
+				miss: null,
+				place: 0,
+			},
 		]),
 	);
 	for (const p of picks) {
@@ -80,18 +98,25 @@ export function weekResults(
 		else if (outcome === "loss") row.losses += 1;
 		else if (outcome === "push") row.pushes += 1;
 	}
-	return [...rows.values()].sort(
-		(a, b) => b.points - a.points || b.wins - a.wins,
+	const misses = tiebreakerMisses(
+		picks,
+		games
+			.filter((g) => g.state === "post")
+			.map((g) => ({
+				id: g.id,
+				kickoff: g.kickoff,
+				home_score: g.homeScore,
+				away_score: g.awayScore,
+			})),
 	);
-}
-
-/**
- * Who gets the crown for a finished week: everyone tied on the top score.
- * Kept in one place so it can switch to the league-wide weekly ranking
- * (and its tiebreaker) without touching the grid.
- */
-export function weekWinners(rows: WeekResultRow[], weekDone: boolean) {
-	const best = rows[0]?.points ?? 0;
-	if (!weekDone || best <= 0) return new Set<string>();
-	return new Set(rows.filter((r) => r.points === best).map((r) => r.userId));
+	return rankWeek(
+		[...rows.values()].map((r) => ({
+			userId: r.userId,
+			points: r.points,
+			miss: misses.get(r.userId) ?? null,
+		})),
+	).flatMap((e) => {
+		const row = rows.get(e.userId);
+		return row ? [{ ...row, miss: e.miss, place: e.place }] : [];
+	});
 }

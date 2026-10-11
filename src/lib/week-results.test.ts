@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Game, Team } from "./nfl/types";
-import { weekResults, weekWinners } from "./week-results";
+import { weekResults } from "./week-results";
 
 const team = (abbr: string): Team => ({
 	id: abbr,
@@ -82,22 +82,24 @@ describe("weekResults", () => {
 		expect(rows).toHaveLength(1);
 		expect(rows[0].points).toBe(9);
 	});
-});
 
-describe("weekWinners", () => {
-	const row = (userId: string, points: number) => ({
-		userId,
-		cells: {},
-		points,
-		wins: points,
-		losses: 0,
-		pushes: 0,
-	});
-
-	it("crowns everyone tied on top once the week is done", () => {
-		const rows = [row("a", 9), row("b", 9), row("c", 4)];
-		expect([...weekWinners(rows, true)]).toEqual(["a", "b"]);
-		expect(weekWinners(rows, false).size).toBe(0);
-		expect(weekWinners([row("a", 0)], true).size).toBe(0);
+	it("breaks a tie on points with the Monday night guess", () => {
+		// g2 is the week's last game (17 + 17 = 34 points).
+		const late = [games[0], { ...games[1], kickoff: "2026-09-22T00:15:00Z" }];
+		const rows = weekResults(
+			["a", "b"],
+			[
+				pick("a", "g1", "KC"),
+				{ ...pick("a", "g2", "KC"), tiebreaker: 50 },
+				pick("b", "g1", "KC"),
+				{ ...pick("b", "g2", "KC"), tiebreaker: 30 },
+			],
+			late,
+			{ mode: "straight" },
+		);
+		expect(rows.map((r) => [r.userId, r.place, r.miss])).toEqual([
+			["b", 1, 4],
+			["a", 2, 16],
+		]);
 	});
 });
