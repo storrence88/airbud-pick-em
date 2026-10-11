@@ -33,11 +33,17 @@ import { Avatar } from "./Avatar";
 import { WeekLeaderboard } from "./WeekLeaderboard";
 
 const BADGE_STYLE: Record<BadgeId, { icon: LucideIcon; className: string }> = {
-	"week-winner": { icon: Crown, className: "text-amber-300" },
+	"week-winner": {
+		icon: Crown,
+		className: "text-amber-600 dark:text-amber-300",
+	},
 	perfect: { icon: BadgeCheck, className: "text-primary" },
-	upset: { icon: Zap, className: "text-sky-300" },
-	locks: { icon: Star, className: "text-amber-300" },
-	"longest-streak": { icon: Rocket, className: "text-violet-300" },
+	upset: { icon: Zap, className: "text-sky-600 dark:text-sky-300" },
+	locks: { icon: Star, className: "text-amber-600 dark:text-amber-300" },
+	"longest-streak": {
+		icon: Rocket,
+		className: "text-violet-600 dark:text-violet-300",
+	},
 	"worst-week": { icon: Skull, className: "text-muted-foreground" },
 };
 
@@ -238,7 +244,7 @@ function StandingRow({
 						{lastPlace && (
 							<span
 								title="Last place last week"
-								className="inline-flex shrink-0 text-amber-200/80"
+								className="inline-flex shrink-0 text-amber-600/80 dark:text-amber-200/80"
 							>
 								<Toilet className="size-4" aria-hidden />
 								<span className="sr-only">Last place last week</span>
@@ -312,7 +318,7 @@ function StreakFlame({ streak }: { streak: number }) {
 	return (
 		<span
 			title={`${streak} right in a row`}
-			className="inline-flex shrink-0 items-center gap-0.5 text-xs font-bold text-orange-400 tabular-nums"
+			className="inline-flex shrink-0 items-center gap-0.5 text-xs font-bold text-orange-600 dark:text-orange-400 tabular-nums"
 		>
 			<motion.span
 				className="inline-flex origin-bottom"
