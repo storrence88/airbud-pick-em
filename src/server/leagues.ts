@@ -10,6 +10,7 @@ import {
 } from "#/lib/profile";
 import type { ScoringMode } from "#/lib/scoring";
 import { getSupabaseServerClient } from "#/lib/supabase.server";
+import { MAX_TIEBREAKER, tiebreakerGameId } from "#/lib/tiebreaker";
 import { syncWeek } from "./sync";
 
 export interface League {
@@ -38,6 +39,8 @@ export interface PickRow {
 	team: string;
 	confidence: number | null;
 	is_lock: boolean;
+	/** Monday night tiebreaker guess, only on the week's last game. */
+	tiebreaker: number | null;
 	/** The commissioner who entered this pick for the member, if they didn't. */
 	entered_by: string | null;
 }
@@ -47,7 +50,8 @@ export interface TrashTalk {
 	body: string;
 }
 
-const PICK_COLUMNS = "user_id, game_id, team, confidence, is_lock, entered_by";
+const PICK_COLUMNS =
+	"user_id, game_id, team, confidence, is_lock, tiebreaker, entered_by";
 
 async function requireUser() {
 	const sb = getSupabaseServerClient();
@@ -131,7 +135,7 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 	.inputValidator(
 		z.object({
 			leagueId: z.string().uuid(),
-			week: z.number().int().optional(),
+			week: z.number().int().min(1).max(23).optional(),
 		}),
 	)
 	.handler(async ({ data }) => {
@@ -191,9 +195,13 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 			]),
 		);
 
-		// Removed members' kept picks belong to the standings, not this week.
+		// Removed members' kept picks stay out of the pick board but still show
+		// in the week's results, muted like the standings' "Former members".
 		const roster = (members ?? []).map(toMember);
 		const inLeague = new Set(roster.map((m) => m.user_id));
+		const allPicks = (picks ?? []) as PickRow[];
+		const formerPicks = allPicks.filter((p) => !inLeague.has(p.user_id));
+		const formers = await formerProfiles(sb, formerPicks);
 
 		return {
 			userId: user.id,
@@ -205,9 +213,9 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 				crowdHomePct: lockedById.get(g.id)?.crowd ?? null,
 			})),
 			members: roster,
-			picks: ((picks ?? []) as PickRow[]).filter((p) =>
-				inLeague.has(p.user_id),
-			),
+			picks: allPicks.filter((p) => inLeague.has(p.user_id)),
+			formers,
+			formerPicks,
 			trashTalk: {
 				season,
 				week,
@@ -218,11 +226,13 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 		};
 	});
 
+/** A week of the league. Leave out `week` for the current one; earlier weeks are finished, so they don't poll. */
 export const leagueWeekQuery = (leagueId: string, week?: number) =>
 	queryOptions({
 		queryKey: ["league", leagueId, "week", week ?? "current"],
 		queryFn: () => getLeagueWeek({ data: { leagueId, week } }),
-		refetchInterval: 30_000,
+		refetchInterval: week ? false : 30_000,
+		staleTime: week ? 5 * 60_000 : 0,
 	});
 
 /** Saves a pick and returns its confidence value (assigned by the DB in confidence leagues). */
@@ -330,6 +340,63 @@ export const setLock = createServerFn({ method: "POST" })
 		if (error) throw new Error(error.message);
 	});
 
+/**
+ * Saves (or clears) your Monday night tiebreaker guess: total points in the
+ * week's last game. It lives on your pick for that game, so pick a winner
+ * there first; RLS locks it at that game's kickoff.
+ */
+export const setTiebreaker = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			gameId: z.string(),
+			points: z.number().int().min(0).max(MAX_TIEBREAKER).nullable(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb, user } = await requireUser();
+		const { data: game } = await sb
+			.from("games")
+			.select("season, week")
+			.eq("id", data.gameId)
+			.maybeSingle();
+		if (!game) throw new Error("Game not found.");
+		const { data: week } = await sb
+			.from("games")
+			.select("id, kickoff")
+			.eq("season", game.season)
+			.eq("week", game.week);
+		const weekGames = week ?? [];
+		if (tiebreakerGameId(weekGames) !== data.gameId)
+			throw new Error("The tiebreaker is on the week's last game.");
+		const kickoff = weekGames.find((g) => g.id === data.gameId)?.kickoff;
+		if (kickoff && Date.parse(kickoff) <= Date.now())
+			throw new Error("That game has already started.");
+		const { data: saved, error } = await sb
+			.from("picks")
+			.update({ tiebreaker: data.points, updated_at: new Date().toISOString() })
+			.match({
+				league_id: data.leagueId,
+				user_id: user.id,
+				game_id: data.gameId,
+			})
+			.select("game_id");
+		if (error) throw new Error(error.message);
+		if (!saved?.length) throw new Error("Pick a winner in that game first.");
+		// A guess left on a game that's no longer last (schedule change) shouldn't linger.
+		const others = weekGames
+			.filter((g) => g.id !== data.gameId && Date.parse(g.kickoff) > Date.now())
+			.map((g) => g.id);
+		if (others.length)
+			await sb
+				.from("picks")
+				.update({ tiebreaker: null })
+				.eq("league_id", data.leagueId)
+				.eq("user_id", user.id)
+				.in("game_id", others)
+				.not("tiebreaker", "is", null);
+	});
+
 /** Saves this week's trash talk line, or removes it when empty. */
 export const saveTrashTalk = createServerFn({ method: "POST" })
 	.inputValidator(
@@ -368,6 +435,22 @@ export const saveTrashTalk = createServerFn({ method: "POST" })
 		// RLS rejects writes once the week's lines are revealed.
 		if (error) throw new Error(error.code === "42501" ? locked : error.message);
 	});
+
+/** Profiles of the people behind picks kept from members who left or were removed. */
+async function formerProfiles(
+	sb: ReturnType<typeof getSupabaseServerClient>,
+	picks: PickRow[],
+) {
+	const ids = [...new Set(picks.map((p) => p.user_id))];
+	if (!ids.length) return [];
+	const { data } = await sb
+		.from("profiles")
+		.select(`id, ${PUBLIC_PROFILE_COLUMNS}`)
+		.in("id", ids);
+	return (data ?? []).map(
+		({ id, ...p }) => ({ user_id: id as string, ...p }) as FormerMember,
+	);
+}
 
 const PAGE = 1000;
 
@@ -418,17 +501,9 @@ export const getStandingsData = createServerFn({ method: "GET" })
 			.eq("league_id", data.leagueId);
 		if (rosterError) throw new Error(rosterError.message);
 		const inLeague = new Set((roster ?? []).map((m) => m.user_id as string));
-		const formerIds = [
-			...new Set(picks.map((p) => p.user_id).filter((id) => !inLeague.has(id))),
-		];
-		const { data: formerProfiles } = formerIds.length
-			? await sb
-					.from("profiles")
-					.select(`id, ${PUBLIC_PROFILE_COLUMNS}`)
-					.in("id", formerIds)
-			: { data: [] };
-		const formers = (formerProfiles ?? []).map(
-			({ id, ...p }) => ({ user_id: id as string, ...p }) as FormerMember,
+		const formers = await formerProfiles(
+			sb,
+			picks.filter((p) => !inLeague.has(p.user_id)),
 		);
 		return { games, weeks, picks, formers };
 	});

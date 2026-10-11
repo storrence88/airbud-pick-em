@@ -31,6 +31,9 @@ export const getMyProfile = createServerFn({ method: "GET" }).handler(
 			.single();
 		if (error) throw new Error(error.message);
 		const discord = user.user_metadata?.avatar_url;
+		const hasDiscord = Boolean(
+			user.identities?.some((i) => i.provider === "discord"),
+		);
 		return {
 			userId: user.id,
 			profile: data as unknown as MyProfile,
@@ -40,6 +43,8 @@ export const getMyProfile = createServerFn({ method: "GET" }).handler(
 				discord.startsWith("https://cdn.discordapp.com/")
 					? discord
 					: null,
+			/** Discord DM reminders need a Discord sign-in. */
+			hasDiscord,
 		};
 	},
 );
@@ -74,6 +79,7 @@ export const updateProfile = createServerFn({ method: "POST" })
 				),
 				bot_mentions: z.boolean(),
 				reminder_style: z.enum(["gentle", "roast"]),
+				reminder_channel: z.enum(["email", "discord", "off"]),
 			})
 			.partial(),
 	)

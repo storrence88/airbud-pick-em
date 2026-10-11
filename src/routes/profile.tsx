@@ -29,6 +29,7 @@ import {
 	WIN_EFFECTS,
 	type WinEffect,
 } from "#/lib/profile";
+import { REMINDER_CHANNELS, type ReminderChannel } from "#/lib/reminders";
 import { supabase } from "#/lib/supabase";
 import { accentColors } from "#/lib/team-colors";
 import { cn } from "#/lib/utils";
@@ -208,11 +209,23 @@ function ProfilePage() {
 			</Section>
 
 			<Section
-				title="Discord bot"
-				hint="How the league's Discord bot treats you in pick reminders."
+				title="Pick reminders"
+				hint="A few hours before each game day's first kickoff, if you still have open picks."
 			>
+				<Segmented
+					label="Remind me by"
+					value={form.reminder_channel}
+					options={REMINDER_CHANNELS}
+					onChange={(v) => set("reminder_channel", v as ReminderChannel)}
+				/>
+				{form.reminder_channel === "discord" && !data.hasDiscord && (
+					<p className="-mt-2 text-sm text-muted-foreground">
+						Sign in with Discord once so the bot can find you. Until then,
+						reminders come by email.
+					</p>
+				)}
 				<Toggle
-					label="@mention me when I haven't picked"
+					label="Let the Discord bot @mention me when I haven't picked"
 					checked={form.bot_mentions}
 					onChange={(v) => set("bot_mentions", v)}
 				/>
