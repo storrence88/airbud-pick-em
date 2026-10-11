@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { colorDistance, contrast, splitColors } from "./team-colors";
+import {
+	accentColors,
+	colorDistance,
+	contrast,
+	splitColors,
+} from "./team-colors";
 
 const team = (color: string, altColor: string) => ({ color, altColor });
 // ESPN's primary and alternate colors.
@@ -36,5 +41,34 @@ describe("splitColors", () => {
 	it("still separates teams with identical colors", () => {
 		const { away, home } = splitColors(SF, SF);
 		expect(colorDistance(away, home)).toBeGreaterThan(10);
+	});
+});
+
+describe("light mode", () => {
+	it("swaps light colors for darker ones on the white card", () => {
+		// A white primary reads on dark but vanishes on white.
+		const { home } = splitColors(SF, team("#ffffff", "#003b75"), "light");
+		expect(home).toBe("#003b75");
+	});
+
+	it("darkens a team whose colors are all too light", () => {
+		const { away } = splitColors(team("#ffffff", "#fafafa"), SF, "light");
+		expect(contrast(away, "#ffffff")).toBeGreaterThanOrEqual(1.5);
+	});
+
+	it("keeps dark primaries that disappear in dark mode", () => {
+		expect(splitColors(LV, NE, "light")).toEqual({
+			away: "#000000",
+			home: "#002244",
+		});
+	});
+});
+
+describe("accentColors", () => {
+	it("picks an accent that reads on each theme's page", () => {
+		expect(accentColors(LV, "dark").accent).toBe("#a5acaf");
+		expect(accentColors(LV, "light").accent).toBe("#000000");
+		const light = accentColors(team("#ffd100", "#fff200"), "light").accent;
+		expect(contrast(light, "#f9fafb")).toBeGreaterThanOrEqual(3);
 	});
 });

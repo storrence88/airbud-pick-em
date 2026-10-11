@@ -22,9 +22,11 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfidenceBoard } from "#/components/ConfidenceBoard";
+import { useOnline } from "#/components/ConnectionBanner";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
+import { LeaguePageSkeleton } from "#/components/Skeleton";
 import { Standings } from "#/components/Standings";
 import { SurvivorLink } from "#/components/SurvivorLink";
 import { Tiebreaker } from "#/components/Tiebreaker";
@@ -83,6 +85,7 @@ export const Route = createFileRoute("/league/$leagueId")({
 		);
 	},
 	component: LeaguePage,
+	pendingComponent: LeaguePageSkeleton,
 	errorComponent: ({ error }) => (
 		<main className="mx-auto max-w-3xl px-4 py-16 text-muted-foreground">
 			{(error as Error).message}
@@ -224,6 +227,8 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 	const shown = games[0]?.week ?? week ?? 0;
 	const thisWeek = current.games[0]?.week ?? shown;
 	const loading = useRouterState({ select: (s) => s.isLoading });
+	// Nothing can save offline, so picks wait rather than look saved when they aren't.
+	const offline = !useOnline() && !past;
 
 	// Stepping back a week is the common move, so have it ready.
 	useEffect(() => {
@@ -441,9 +446,10 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 
 	return (
 		<section
+			inert={offline}
 			className={cn(
 				"mt-6 transition-opacity",
-				loading && "pointer-events-none opacity-60",
+				(loading || offline) && "pointer-events-none opacity-60",
 			)}
 		>
 			<div className="flex items-end justify-between gap-3">
