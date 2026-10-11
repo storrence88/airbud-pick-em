@@ -4,7 +4,7 @@
 // Everything else (pages, server functions, Supabase, ESPN) always goes to the
 // network, so picks and scores are never stale.
 
-const CACHE = "pickem-shell-v1";
+const CACHE = "pickem-shell-v2";
 const PRECACHE = [
 	"/offline.html",
 	"/icons/icon-192.png",

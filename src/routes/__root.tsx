@@ -46,7 +46,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		],
 		links: [
 			{ rel: "manifest", href: "/manifest.webmanifest" },
-			{ rel: "icon", type: "image/svg+xml", href: "/icons/icon.svg" },
 			{
 				rel: "icon",
 				type: "image/png",
