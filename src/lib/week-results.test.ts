@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Game, Team } from "./nfl/types";
-import { weekResults } from "./week-results";
+import { weekResults, weekWinners } from "./week-results";
 
 const team = (abbr: string): Team => ({
 	id: abbr,
@@ -81,5 +81,23 @@ describe("weekResults", () => {
 		);
 		expect(rows).toHaveLength(1);
 		expect(rows[0].points).toBe(9);
+	});
+});
+
+describe("weekWinners", () => {
+	const row = (userId: string, points: number) => ({
+		userId,
+		cells: {},
+		points,
+		wins: points,
+		losses: 0,
+		pushes: 0,
+	});
+
+	it("crowns everyone tied on top once the week is done", () => {
+		const rows = [row("a", 9), row("b", 9), row("c", 4)];
+		expect([...weekWinners(rows, true)]).toEqual(["a", "b"]);
+		expect(weekWinners(rows, false).size).toBe(0);
+		expect(weekWinners([row("a", 0)], true).size).toBe(0);
 	});
 });

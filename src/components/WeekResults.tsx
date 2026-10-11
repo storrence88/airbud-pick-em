@@ -5,7 +5,12 @@ import type { Game, Team } from "#/lib/nfl/types";
 import type { PublicProfile } from "#/lib/profile";
 import type { ScoringSettings } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
-import { type WeekCell, type WeekPick, weekResults } from "#/lib/week-results";
+import {
+	type WeekCell,
+	type WeekPick,
+	weekResults,
+	weekWinners,
+} from "#/lib/week-results";
 import { Avatar } from "./Avatar";
 
 type Player = PublicProfile & { user_id: string };
@@ -62,7 +67,7 @@ export function WeekResults({
 	);
 	const players = new Map([...members, ...formers].map((p) => [p.user_id, p]));
 	const done = games.length > 0 && games.every((g) => g.state === "post");
-	const best = rows[0]?.points ?? 0;
+	const winners = weekWinners(rows, done);
 	const showConfidence = settings.mode === "confidence";
 
 	return (
@@ -95,7 +100,7 @@ export function WeekResults({
 									cells={r.cells}
 									points={r.points}
 									me={r.userId === userId}
-									crown={done && best > 0 && r.points === best}
+									crown={winners.has(r.userId)}
 									showConfidence={showConfidence}
 								/>
 							);

@@ -84,3 +84,14 @@ export function weekResults(
 		(a, b) => b.points - a.points || b.wins - a.wins,
 	);
 }
+
+/**
+ * Who gets the crown for a finished week: everyone tied on the top score.
+ * Kept in one place so it can switch to the league-wide weekly ranking
+ * (and its tiebreaker) without touching the grid.
+ */
+export function weekWinners(rows: WeekResultRow[], weekDone: boolean) {
+	const best = rows[0]?.points ?? 0;
+	if (!weekDone || best <= 0) return new Set<string>();
+	return new Set(rows.filter((r) => r.points === best).map((r) => r.userId));
+}
