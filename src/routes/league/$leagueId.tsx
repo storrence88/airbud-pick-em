@@ -20,6 +20,7 @@ import {
 	type RankedPick,
 	settle,
 } from "#/lib/confidence";
+import { enteredNote } from "#/lib/entered";
 import type { Game } from "#/lib/nfl/types";
 import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
@@ -215,6 +216,11 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 					team: vars.team,
 					confidence: vars.confidence,
 					is_lock: mine.get(vars.gameId)?.is_lock ?? false,
+					// Choosing a team yourself clears the commissioner's note.
+					entered_by:
+						mine.get(vars.gameId)?.team === vars.team
+							? (mine.get(vars.gameId)?.entered_by ?? null)
+							: null,
 				},
 			]);
 			return { prev };
@@ -439,6 +445,14 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 								onPick={(team) => choose(g, team)}
 								lineText={league.mode === "spread" ? lineText(g) : g.spreadText}
 								others={others}
+								note={enteredNote(
+									data.picks.filter(
+										(p) =>
+											p.game_id === g.id && (locked || p.user_id === userId),
+									),
+									userId,
+									names,
+								)}
 								lock={
 									myPick && (!lockInPlay || myPick.is_lock)
 										? {
