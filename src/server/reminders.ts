@@ -24,38 +24,48 @@ export interface OpenPicks {
 }
 
 /**
- * Who in these leagues hasn't picked which of these games. Reads with the
- * secret key; callers only ever tell a player about their own open games.
+ * Who in these leagues hasn't picked which of these games. The reminder job
+ * reads everyone with the secret key; the open picks nudge passes `userId`
+ * and the signed-in client to read just that player. Callers only ever tell
+ * a player about their own open games.
  */
 export async function openPicks(
-	admin: SupabaseClient,
+	sb: SupabaseClient,
 	leagues: { id: string; name: string }[],
 	games: Game[],
+	userId?: string,
 ): Promise<OpenPicks[]> {
 	if (!leagues.length || !games.length) return [];
 	const ids = leagues.map((l) => l.id);
-	const [{ data: members, error }, { data: picks }] = await Promise.all([
-		admin
-			.from("league_members")
-			.select(
-				"league_id, user_id, profiles(display_name, reminder_channel, reminder_style)",
-			)
-			.in("league_id", ids),
-		admin
-			.from("picks")
-			.select("league_id, user_id, game_id")
-			.in("league_id", ids)
-			.in(
-				"game_id",
-				games.map((g) => g.id),
-			),
-	]);
+	let members = sb
+		.from("league_members")
+		.select(
+			"league_id, user_id, profiles(display_name, reminder_channel, reminder_style)",
+		)
+		.in("league_id", ids);
+	let picks = sb
+		.from("picks")
+		.select("league_id, user_id, game_id")
+		.in("league_id", ids)
+		.in(
+			"game_id",
+			games.map((g) => g.id),
+		);
+	if (userId) {
+		members = members.eq("user_id", userId);
+		picks = picks.eq("user_id", userId);
+	}
+	const [memberRes, picksRes] = await Promise.all([members, picks]);
+	// A missing pick list would read as every game open, so fail loudly.
+	const error = memberRes.error ?? picksRes.error;
 	if (error) throw new Error(error.message);
 	const picked = new Set(
-		(picks ?? []).map((p) => `${p.league_id}:${p.user_id}:${p.game_id}`),
+		(picksRes.data ?? []).map(
+			(p) => `${p.league_id}:${p.user_id}:${p.game_id}`,
+		),
 	);
 	const names = new Map(leagues.map((l) => [l.id, l.name]));
-	return (members ?? []).flatMap((m) => {
+	return (memberRes.data ?? []).flatMap((m) => {
 		const p = m.profiles as unknown as {
 			display_name: string;
 			reminder_channel: ReminderChannel;

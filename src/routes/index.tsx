@@ -1,6 +1,12 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	Link,
+	useNavigate,
+	useRouteContext,
+} from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { useEffect } from "react";
+import { OpenPicksNudge } from "#/components/OpenPicksNudge";
 import { authErrorMessage } from "#/lib/auth-errors";
 import { SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 
@@ -8,6 +14,7 @@ export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
 	const navigate = useNavigate();
+	const { user } = useRouteContext({ from: "__root__" });
 	// Supabase sends failed sign-in links to the site root with the error in
 	// the query string or hash; show it on the sign-in page instead.
 	useEffect(() => {
@@ -21,6 +28,7 @@ function Home() {
 
 	return (
 		<main className="mx-auto max-w-5xl px-4 py-10 sm:py-16">
+			{user && <OpenPicksNudge className="mb-8 max-w-xl sm:mb-12" />}
 			<motion.h1
 				initial={{ opacity: 0, y: 24 }}
 				animate={{ opacity: 1, y: 0 }}
