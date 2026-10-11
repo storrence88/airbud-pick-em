@@ -596,6 +596,7 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 								picked={myPick?.team}
 								onPick={(team) => choose(g, team)}
 								lineText={league.mode === "spread" ? lineText(g) : g.spreadText}
+								lockedSpread={league.mode === "spread" ? g.lockedSpread : null}
 								others={others}
 								note={enteredNote(
 									data.picks.filter(

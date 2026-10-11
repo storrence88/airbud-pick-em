@@ -9,6 +9,8 @@ export interface Team {
 	altColor: string;
 	logo: string;
 	record?: string;
+	homeRecord?: string;
+	roadRecord?: string;
 }
 
 export interface Game {

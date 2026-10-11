@@ -1,10 +1,11 @@
-import { Check, Lock, PencilLine, Sparkles, Star } from "lucide-react";
+import { Check, Info, Lock, PencilLine, Sparkles, Star } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
 import { accentColors, splitColors } from "#/lib/team-colors";
 import { useResolvedTheme } from "#/lib/theme";
 import { cn } from "#/lib/utils";
+import { GameDetailsSheet } from "./GameDetails";
 import { cardEffect, type EffectKind, PickEffect } from "./PickEffect";
 
 interface Props {
@@ -25,6 +26,8 @@ interface Props {
 	onEffectDone?: () => void;
 	/** Who won by picking against 80%+ of ESPN, once the game is final. */
 	faded?: { crowd: number; names: string[] } | null;
+	/** Home line frozen at kickoff, shown in the details sheet for ATS leagues. */
+	lockedSpread?: number | null;
 }
 
 function formatKickoff(iso: string) {
@@ -47,7 +50,9 @@ export function GameCard({
 	effect,
 	onEffectDone,
 	faded,
+	lockedSpread,
 }: Props) {
+	const [details, setDetails] = useState(false);
 	const line = lineText === undefined ? game.spreadText : lineText;
 	const locked = game.state !== "pre";
 	// Once a game is final the losing side fades back so the result reads at a glance.
@@ -96,6 +101,15 @@ export function GameCard({
 						<LockToggle on={lock.on} locked={locked} onToggle={lock.onToggle} />
 					)}
 					{line && <span>{line}</span>}
+					<button
+						type="button"
+						onClick={() => setDetails(true)}
+						aria-label={`${game.away.abbr} at ${game.home.abbr} details`}
+						title="Injuries, weather and line movement"
+						className="-my-1 -mr-1.5 grid size-7 place-items-center rounded-full transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<Info className="size-4" aria-hidden />
+					</button>
 				</span>
 			</div>
 			<div className="grid grid-cols-2 gap-2 p-3">
@@ -142,6 +156,12 @@ export function GameCard({
 				</p>
 			)}
 			{footer}
+			<GameDetailsSheet
+				game={game}
+				open={details}
+				onClose={() => setDetails(false)}
+				lockedSpread={lockedSpread}
+			/>
 			{effect && onEffectDone && (
 				<PickEffect
 					key={effect}
