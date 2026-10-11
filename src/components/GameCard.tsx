@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useState } from "react";
 import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
 import { accentColors, splitColors } from "#/lib/team-colors";
+import { useResolvedTheme } from "#/lib/theme";
 import { cn } from "#/lib/utils";
 import { GameDetailsSheet } from "./GameDetails";
 import { cardEffect, type EffectKind, PickEffect } from "./PickEffect";
@@ -64,10 +65,14 @@ export function GameCard({
 			: picked === game.away.abbr
 				? game.away
 				: null;
+	const theme = useResolvedTheme();
 	const effectColors = pickedTeam
-		? [accentColors(pickedTeam).accent, pickedTeam.altColor]
+		? [accentColors(pickedTeam, theme).accent, pickedTeam.altColor]
 		: [];
-	const cardFx = cardEffect(effect, effectColors[0] ?? "#ffffff");
+	const cardFx = cardEffect(
+		effect,
+		effectColors[0] ?? (theme === "dark" ? "#ffffff" : "#000000"),
+	);
 	return (
 		<motion.article
 			initial={{ opacity: 0, y: 16 }}
@@ -197,7 +202,7 @@ function LockToggle({
 	const style = cn(
 		"-my-1 inline-flex h-7 items-center gap-1 rounded-full border px-2.5 font-semibold transition-colors",
 		on
-			? "border-amber-400/50 bg-amber-400/15 text-amber-300"
+			? "border-amber-500/50 bg-amber-400/15 text-amber-700 dark:border-amber-400/50 dark:text-amber-300"
 			: "border-border text-muted-foreground hover:text-foreground",
 	);
 	if (locked) return <span className={style}>{content}</span>;
@@ -242,7 +247,10 @@ function PublicSplit({
 	home: Team;
 	split: PublicPicks;
 }) {
-	const colors = splitColors(away, home);
+	// Both themes' colors go out as variables; CSS shows the right pair, so
+	// server-rendered bars match whichever theme the page loads in.
+	const light = splitColors(away, home, "light");
+	const dark = splitColors(away, home, "dark");
 	return (
 		<div
 			className="px-3 pb-3"
@@ -259,17 +267,25 @@ function PublicSplit({
 					<span className="font-semibold text-foreground">{split.home}%</span>
 				</span>
 			</div>
-			<div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-muted">
+			<div
+				className="flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-muted"
+				style={
+					{
+						"--away-light": light.away,
+						"--away-dark": dark.away,
+						"--home-light": light.home,
+						"--home-dark": dark.home,
+					} as React.CSSProperties
+				}
+			>
 				<motion.span
-					className="h-full rounded-l-full"
-					style={{ background: colors.away }}
+					className="h-full rounded-l-full bg-(--away-light) dark:bg-(--away-dark)"
 					initial={{ width: 0 }}
 					animate={{ width: `${split.away}%` }}
 					transition={{ type: "spring", stiffness: 120, damping: 20 }}
 				/>
 				<motion.span
-					className="ml-auto h-full rounded-r-full"
-					style={{ background: colors.home }}
+					className="ml-auto h-full rounded-r-full bg-(--home-light) dark:bg-(--home-dark)"
 					initial={{ width: 0 }}
 					animate={{ width: `${split.home}%` }}
 					transition={{ type: "spring", stiffness: 120, damping: 20 }}

@@ -208,7 +208,7 @@ function PlayerRow({
 					<span className="min-w-0 flex-1 truncate">{player.display_name}</span>
 					{crown && (
 						<Crown
-							className="size-3.5 shrink-0 text-amber-300"
+							className="size-3.5 shrink-0 text-amber-600 dark:text-amber-300"
 							aria-label="Won the week"
 						/>
 					)}
@@ -287,7 +287,7 @@ function PickCell({
 				)}
 				{cell.isLock && (
 					<Star
-						className="absolute -top-1 -right-1 size-3 fill-amber-300 text-amber-300"
+						className="absolute -top-1 -right-1 size-3 fill-amber-500 dark:fill-amber-300 text-amber-600 dark:text-amber-300"
 						aria-label="Lock of the week"
 					/>
 				)}
