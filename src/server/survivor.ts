@@ -11,7 +11,7 @@ import {
 	type SurvivorState,
 	survivorState,
 } from "#/lib/survivor";
-import { syncWeek } from "./sync";
+import { survivorWeek } from "./survivor-week";
 
 export interface SurvivorPool {
 	league_id: string;
@@ -101,24 +101,9 @@ export const getSurvivor = createServerFn({ method: "GET" })
 		);
 		const season = (pool?.season as number | undefined) ?? league.season;
 
-		const games = await syncWeek();
-		const espnWeek = games[0]?.week ?? 0;
-		const sameSeason = (games[0]?.season ?? season) === season;
-		// Playoff weeks reuse 1 to 5, so a finished week 18 means the regular season is over.
-		const { data: week18 } = await sb
-			.from("games")
-			.select("state")
-			.eq("season", season)
-			.eq("week", SURVIVOR_LAST_WEEK);
-		const regularSeasonOver =
-			!sameSeason ||
-			(!!week18?.length && week18.every((g) => g.state === "post"));
-		const currentWeek = regularSeasonOver ? SURVIVOR_LAST_WEEK + 1 : espnWeek;
-		const weekGames = regularSeasonOver ? [] : games;
-		const currentWeekClosed =
-			weekGames.length > 0 && weekGames.every((g) => g.state !== "pre");
+		const { currentWeek, weekGames, currentWeekClosed, started } =
+			await survivorWeek(sb, season);
 		// Turning survivor on starts with the next week nobody has played yet.
-		const started = weekGames.some((g) => g.state !== "pre");
 		const nextStart = started ? currentWeek + 1 : currentWeek;
 		const nextStartWeek =
 			nextStart >= 1 && nextStart <= SURVIVOR_LAST_WEEK ? nextStart : null;

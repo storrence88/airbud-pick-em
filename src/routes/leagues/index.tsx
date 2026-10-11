@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { OpenPicksBadge, OpenPicksNudge } from "#/components/OpenPicksNudge";
 import { SCORING_MODES } from "#/lib/scoring";
 import { joinLeague, myLeaguesQuery } from "#/server/leagues";
 
@@ -50,6 +51,7 @@ function MyLeagues() {
 					New league
 				</Link>
 			</div>
+			<OpenPicksNudge className="mt-6" />
 			<div className="mt-6 grid gap-3">
 				{data.length === 0 && (
 					<p className="text-muted-foreground">
@@ -77,11 +79,14 @@ function MyLeagues() {
 									{SCORING_MODES[league.mode].label} · {league.season} season
 								</span>
 							</span>
-							{role === "commissioner" && (
-								<span className="text-xs font-semibold uppercase tracking-wider text-primary">
-									Commish
-								</span>
-							)}
+							<span className="flex shrink-0 items-center gap-3">
+								<OpenPicksBadge leagueId={league.id} />
+								{role === "commissioner" && (
+									<span className="text-xs font-semibold uppercase tracking-wider text-primary">
+										Commish
+									</span>
+								)}
+							</span>
 						</Link>
 					</motion.div>
 				))}
