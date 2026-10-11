@@ -5,17 +5,10 @@
 -- The old policy let the league's creator update any column (mode, season,
 -- invite code, created_by) straight through the API, and keyed off created_by
 -- rather than the commissioner role. All league edits now go through the RPC.
-drop policy "commissioner edits league" on leagues;
+drop policy if exists "commissioner edits league" on leagues;
 
-create function is_commissioner(lid uuid) returns boolean
-language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from league_members
-    where league_id = lid and user_id = auth.uid() and role = 'commissioner'
-  )
-$$;
-
-create function update_league_settings(p_league uuid, p_name text, p_push_value numeric)
+-- is_commissioner() comes from 0004.
+create or replace function update_league_settings(p_league uuid, p_name text, p_push_value numeric)
 returns leagues
 language plpgsql security definer set search_path = public as $$
 declare l leagues;
