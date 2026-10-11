@@ -10,6 +10,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { MotionConfig } from "motion/react";
 
 import { AppHeader } from "../components/AppHeader";
+import { ServiceWorker } from "../components/ServiceWorker";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { teamByAbbr } from "../lib/nfl/teams";
 import { accentColors } from "../lib/team-colors";
@@ -38,8 +39,25 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{
 				title: "Pick'em",
 			},
+			// Full-screen launch from the home screen (iOS reads these, not the manifest).
+			{ name: "apple-mobile-web-app-capable", content: "yes" },
+			{ name: "mobile-web-app-capable", content: "yes" },
+			{ name: "apple-mobile-web-app-title", content: "Pick'em" },
+			{
+				name: "apple-mobile-web-app-status-bar-style",
+				content: "black-translucent",
+			},
 		],
 		links: [
+			{ rel: "manifest", href: "/manifest.webmanifest" },
+			{ rel: "icon", type: "image/svg+xml", href: "/icons/icon.svg" },
+			{
+				rel: "icon",
+				type: "image/png",
+				sizes: "32x32",
+				href: "/icons/favicon-32.png",
+			},
+			{ rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
 			{
 				rel: "stylesheet",
 				href: appCss,
@@ -86,6 +104,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 						TanStackQueryDevtools,
 					]}
 				/>
+				<ServiceWorker />
 				<Scripts />
 			</body>
 		</html>
