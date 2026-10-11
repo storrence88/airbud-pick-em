@@ -85,6 +85,9 @@ export function WeekWinnerBanner({ leagueId }: { leagueId: string }) {
 							<span className="font-normal text-muted-foreground">
 								{" "}
 								· {fmt(result.winners[0].points)} pts
+								{result.winners.length === 1 &&
+									result.winners[0].tiebroken &&
+									", won on the tiebreaker"}
 							</span>
 						</div>
 					</div>
@@ -289,7 +292,11 @@ function WeekRowItem({
 				<div className="text-xs text-muted-foreground">
 					{idle
 						? "No picks this week"
-						: `${row.correct} of ${row.picked} right`}
+						: `${row.correct} of ${row.picked} right${
+								row.tiebroken && row.miss != null
+									? ` · tiebreaker off by ${row.miss}`
+									: ""
+							}`}
 				</div>
 			</div>
 			<span className="font-display text-2xl font-bold tabular-nums">

@@ -1,15 +1,20 @@
 // One week's leaderboard and who won it. The banner, the weekly tab and the
 // week-winner badge all rank weeks through rankWeek, so they always agree.
+// Ties on points go to the Monday night tiebreaker (see ./tiebreaker).
 
 import { pickOutcome, type ScoringSettings, scorePick } from "./scoring";
 import type { FinishedGame } from "./standings";
+import { rankWeek as rankByTiebreaker, tiebreakerMisses } from "./tiebreaker";
 
 export interface WeekPick {
 	user_id: string;
 	game_id: string;
 	team: string;
 	confidence: number | null;
+	tiebreaker?: number | null;
 }
+
+export type WeekGame = FinishedGame & { kickoff: string };
 
 export interface WeekRow {
 	userId: string;
@@ -17,38 +22,41 @@ export interface WeekRow {
 	correct: number;
 	/** Finished games this member picked this week. */
 	picked: number;
-	/** Shared by tied members (1, 1, 3); null for members who didn't pick. */
+	/** How far off their tiebreaker guess was; null without a guess. */
+	miss: number | null;
+	/** Shared when still tied (1, 1, 3); null for members who didn't pick. */
 	rank: number | null;
-}
-
-export interface RankWeekOptions {
-	/**
-	 * Orders members tied on points; return 0 to leave them tied. Without
-	 * one, equal points share a rank and tied winners are co-winners.
-	 */
-	tiebreak?: (a: WeekRow, b: WeekRow) => number;
+	/** The tiebreaker settled this member's place against someone on the same points. */
+	tiebroken: boolean;
 }
 
 /**
- * Ranks members by points on the week's finished games. Members who picked
- * nothing that week sit unranked at the bottom, so a late joiner or a missed
- * week never counts as a result.
+ * Ranks members by points on the week's finished games, then the closest
+ * tiebreaker guess. Members who picked nothing that week sit unranked at the
+ * bottom, so a late joiner or a missed week never counts as a result.
  */
 export function rankWeek(
 	memberIds: string[],
 	picks: WeekPick[],
-	games: FinishedGame[],
+	games: WeekGame[],
 	week: number,
 	settings: ScoringSettings,
-	{ tiebreak }: RankWeekOptions = {},
 ): WeekRow[] {
-	const byId = new Map(
-		games.filter((g) => g.week === week).map((g) => [g.id, g]),
-	);
+	const weekGames = games.filter((g) => g.week === week);
+	const byId = new Map(weekGames.map((g) => [g.id, g]));
+	const misses = tiebreakerMisses(picks, weekGames);
 	const rows = new Map<string, WeekRow>(
 		memberIds.map((id) => [
 			id,
-			{ userId: id, points: 0, correct: 0, picked: 0, rank: null },
+			{
+				userId: id,
+				points: 0,
+				correct: 0,
+				picked: 0,
+				miss: misses.get(id) ?? null,
+				rank: null,
+				tiebroken: false,
+			},
 		]),
 	);
 	for (const p of picks) {
@@ -70,20 +78,18 @@ export function rankWeek(
 		if (pickOutcome(pick, result, settings.mode) === "win") row.correct += 1;
 	}
 
-	const order = (a: WeekRow, b: WeekRow) =>
-		b.points - a.points || (tiebreak?.(a, b) ?? 0);
 	const played = [...rows.values()].filter((r) => r.picked > 0);
-	// Correct picks only order the list; they don't split a tie.
-	played.sort((a, b) => order(a, b) || b.correct - a.correct);
-	played.forEach((r, i) => {
-		const prev = played[i - 1];
-		r.rank = prev && order(prev, r) === 0 ? prev.rank : i + 1;
+	const ranked = rankByTiebreaker(played).map((e) => {
+		const row = rows.get(e.userId) as WeekRow;
+		return { ...row, rank: e.place, tiebroken: e.tiebroken };
 	});
+	// Correct picks only order a shared place; they don't split it.
+	ranked.sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0) || b.correct - a.correct);
 	const idle = [...rows.values()].filter((r) => r.picked === 0);
-	return [...played, ...idle];
+	return [...ranked, ...idle];
 }
 
-/** Everyone tied for first, if anyone scored. More than one means co-winners. */
+/** Everyone in first place, if anyone scored. More than one means co-winners. */
 export function weekWinners(rows: WeekRow[]): WeekRow[] {
 	return rows.filter((r) => r.rank === 1 && r.points > 0);
 }

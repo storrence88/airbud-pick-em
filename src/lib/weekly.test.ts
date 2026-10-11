@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { FinishedGame } from "./standings";
-import { rankWeek, weekWinners } from "./weekly";
+import { rankWeek, type WeekGame, weekWinners } from "./weekly";
 
 let n = 0;
 /** A final where the home team wins 24-20. */
-function game(week: number): FinishedGame {
+function game(week: number): WeekGame {
 	n += 1;
 	return {
 		id: `g${n}`,
 		week,
+		kickoff: `2026-09-${String(n).padStart(2, "0")}T17:00:00Z`,
 		home_team: "KC",
 		away_team: "BUF",
 		home_score: 24,
@@ -17,7 +17,7 @@ function game(week: number): FinishedGame {
 	};
 }
 
-const pick = (user: string, g: FinishedGame, team: string) => ({
+const pick = (user: string, g: WeekGame, team: string) => ({
 	user_id: user,
 	game_id: g.id,
 	team,
@@ -50,15 +50,20 @@ describe("rankWeek", () => {
 		expect(weekWinners(rows).map((r) => r.userId)).toEqual(["a", "b"]);
 	});
 
-	it("lets a tiebreak split first place", () => {
-		const picks = [pick("a", w1[0], "KC"), pick("b", w1[0], "KC")];
-		const rows = rankWeek(["a", "b"], picks, games, 1, straight, {
-			tiebreak: (x, y) => (x.userId === "b" ? -1 : y.userId === "b" ? 1 : 0),
-		});
-		expect(rows.map((r) => [r.userId, r.rank])).toEqual([
-			["b", 1],
-			["a", 2],
+	it("gives a tie on points to the closer tiebreaker guess", () => {
+		// The last game ends 24-20, a 44-point total.
+		const picks = [
+			pick("a", w1[0], "KC"),
+			{ ...pick("a", w1[2], "BUF"), tiebreaker: 50 },
+			pick("b", w1[0], "KC"),
+			{ ...pick("b", w1[2], "BUF"), tiebreaker: 41 },
+		];
+		const rows = rankWeek(["a", "b"], picks, games, 1, straight);
+		expect(rows.map((r) => [r.userId, r.rank, r.miss])).toEqual([
+			["b", 1, 3],
+			["a", 2, 6],
 		]);
+		expect(rows[0].tiebroken).toBe(true);
 		expect(weekWinners(rows).map((r) => r.userId)).toEqual(["b"]);
 	});
 

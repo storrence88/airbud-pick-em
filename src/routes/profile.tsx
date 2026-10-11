@@ -1,10 +1,16 @@
 import {
 	useMutation,
+	useQuery,
 	useQueryClient,
 	useSuspenseQuery,
 } from "@tanstack/react-query";
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
-import { Check, ImageUp, Play } from "lucide-react";
+import {
+	createFileRoute,
+	Link,
+	redirect,
+	useRouter,
+} from "@tanstack/react-router";
+import { BarChart3, Check, ChevronRight, ImageUp, Play } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useRef, useState } from "react";
 import { Avatar } from "#/components/Avatar";
@@ -26,6 +32,7 @@ import {
 import { supabase } from "#/lib/supabase";
 import { accentColors } from "#/lib/team-colors";
 import { cn } from "#/lib/utils";
+import { myLeaguesQuery } from "#/server/leagues";
 import { myProfileQuery, updateProfile } from "#/server/profile";
 
 export const Route = createFileRoute("/profile")({
@@ -111,6 +118,8 @@ function ProfilePage() {
 					</div>
 				</div>
 			</motion.div>
+
+			<SeasonStatsLinks />
 
 			<Section title="Name and title">
 				<Field label="Display name" htmlFor="name">
@@ -264,6 +273,37 @@ function ProfilePage() {
 				)}
 			</AnimatePresence>
 		</main>
+	);
+}
+
+/** Your stats live per league, since each league scores its own way. */
+function SeasonStatsLinks() {
+	const { user } = Route.useRouteContext();
+	const { data: leagues } = useQuery(myLeaguesQuery());
+	if (!user || !leagues?.length) return null;
+	return (
+		<Section title="Season stats">
+			<ul className="grid gap-2">
+				{leagues.map(({ league }) => (
+					<li key={league.id}>
+						<Link
+							to="/league/$leagueId/stats/$userId"
+							params={{ leagueId: league.id, userId: user.id }}
+							className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-muted"
+						>
+							<BarChart3 className="size-4 shrink-0 text-primary" aria-hidden />
+							<span className="min-w-0 flex-1 truncate font-semibold">
+								{league.name}
+							</span>
+							<ChevronRight
+								className="size-4 shrink-0 text-muted-foreground"
+								aria-hidden
+							/>
+						</Link>
+					</li>
+				))}
+			</ul>
+		</Section>
 	);
 }
 

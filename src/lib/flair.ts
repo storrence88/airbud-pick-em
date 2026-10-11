@@ -12,6 +12,7 @@ export interface FlairPick {
 	team: string;
 	confidence: number | null;
 	is_lock?: boolean;
+	tiebreaker?: number | null;
 }
 
 export type FlairGame = FinishedGame & { kickoff: string };
@@ -152,6 +153,7 @@ export function computeFlair(
 	for (const wk of done) {
 		const ids = played(wk);
 		if (!ids.length) continue;
+		// Ties on points go to the closest Monday night tiebreaker guess.
 		for (const w of weekWinners(
 			rankWeek(memberIds, picks, games, wk, settings),
 		))
