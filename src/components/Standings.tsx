@@ -30,6 +30,7 @@ import {
 	standingsQuery,
 } from "#/server/leagues";
 import { Avatar } from "./Avatar";
+import { RowsSkeleton } from "./Skeleton";
 import { WeekLeaderboard } from "./WeekLeaderboard";
 
 const BADGE_STYLE: Record<BadgeId, { icon: LucideIcon; className: string }> = {
@@ -118,8 +119,7 @@ function SeasonStandings({ leagueId }: { leagueId: string }) {
 	const lastWeek =
 		data?.games.reduce((max, g) => Math.max(max, g.week), 0) ?? 0;
 
-	if (isLoading)
-		return <p className="text-muted-foreground">Loading standings…</p>;
+	if (isLoading) return <RowsSkeleton />;
 	return (
 		<div>
 			{lastWeek === 0 && (

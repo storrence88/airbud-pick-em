@@ -3,12 +3,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
+import { PicksPageSkeleton } from "#/components/Skeleton";
 import { weekGamesQuery } from "#/server/games";
 
 export const Route = createFileRoute("/picks")({
 	loader: ({ context }) =>
 		context.queryClient.ensureQueryData(weekGamesQuery()),
 	component: PicksPage,
+	pendingComponent: PicksPageSkeleton,
 	errorComponent: ({ error }) => (
 		<main className="mx-auto max-w-5xl px-4 py-16 text-muted-foreground">
 			Couldn&apos;t load games: {(error as Error).message}
