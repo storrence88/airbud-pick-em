@@ -143,7 +143,7 @@ function StatusCard({ data }: { data: Data }) {
 				className={cn(
 					"grid size-11 shrink-0 place-items-center rounded-full",
 					won
-						? "bg-amber-400/15 text-amber-400"
+						? "bg-amber-400/15 text-amber-600 dark:text-amber-400"
 						: me?.alive || notStarted
 							? "bg-win/15 text-win"
 							: "bg-loss/15 text-loss",
@@ -472,7 +472,7 @@ function PlayerCell({
 			</span>
 			{winner && (
 				<Crown
-					className="size-3.5 shrink-0 text-amber-400"
+					className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
 					aria-label="Winner"
 				/>
 			)}

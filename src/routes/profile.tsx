@@ -31,7 +31,14 @@ import {
 } from "#/lib/profile";
 import { REMINDER_CHANNELS, type ReminderChannel } from "#/lib/reminders";
 import { supabase } from "#/lib/supabase";
-import { accentColors } from "#/lib/team-colors";
+import { accentColors, accentVars } from "#/lib/team-colors";
+import {
+	setThemePref,
+	THEME_PREFS,
+	type ThemePref,
+	useResolvedTheme,
+	useThemePref,
+} from "#/lib/theme";
 import { cn } from "#/lib/utils";
 import { myLeaguesQuery } from "#/server/leagues";
 import { myProfileQuery, updateProfile } from "#/server/profile";
@@ -64,6 +71,7 @@ function ProfilePage() {
 	const router = useRouter();
 	const [form, setForm] = useState<MyProfile>(data.profile);
 	const [saved, setSaved] = useState(false);
+	const theme = useResolvedTheme();
 	const set = <K extends keyof MyProfile>(key: K, value: MyProfile[K]) => {
 		setSaved(false);
 		setForm((f) => ({ ...f, [key]: value }));
@@ -189,6 +197,10 @@ function ProfilePage() {
 				/>
 			</Section>
 
+			<Section title="Appearance" hint="Saved on this device.">
+				<Appearance />
+			</Section>
+
 			<Section
 				title="Pick reactions"
 				hint="Plays on your game card when one of your picks goes final. Only you see it."
@@ -198,7 +210,7 @@ function ProfilePage() {
 					options={WIN_EFFECTS}
 					value={form.win_effect}
 					onChange={(v) => set("win_effect", v as WinEffect)}
-					teamColor={team ? accentColors(team).accent : undefined}
+					teamColor={team ? accentColors(team, theme).accent : undefined}
 				/>
 				<EffectPicker
 					label="When you're wrong"
@@ -322,6 +334,19 @@ function SeasonStatsLinks() {
 
 const inputClass =
 	"w-full rounded-md border bg-card px-4 py-3 text-base outline-none ring-ring/40 focus:ring-4";
+
+/** Light or dark, applied right away; not part of the saved profile. */
+function Appearance() {
+	const pref = useThemePref();
+	return (
+		<Segmented
+			label="Theme"
+			value={pref}
+			options={THEME_PREFS}
+			onChange={(v) => setThemePref(v as ThemePref)}
+		/>
+	);
+}
 
 function Section({
 	title,
@@ -652,10 +677,11 @@ function TeamPicker({
 						{active && (
 							<motion.span
 								layoutId="team-pick"
-								className="absolute inset-0 rounded-[inherit]"
+								className="team-accent absolute inset-0 rounded-[inherit]"
 								style={{
+									...accentVars(t),
 									background: `linear-gradient(135deg, ${t.color}, color-mix(in oklab, ${t.color} 55%, black))`,
-									boxShadow: `0 0 0 2px ${accentColors(t).accent}`,
+									boxShadow: "0 0 0 2px var(--tc)",
 								}}
 								transition={{ type: "spring", stiffness: 400, damping: 32 }}
 							/>
@@ -701,6 +727,7 @@ function EffectPicker({
 	onChange: (v: string) => void;
 	teamColor?: string;
 }) {
+	const theme = useResolvedTheme();
 	const [playing, setPlaying] = useState<{
 		kind: EffectKind;
 		n: number;
@@ -708,7 +735,7 @@ function EffectPicker({
 	const play = (kind: string) =>
 		kind !== "none" &&
 		setPlaying((p) => ({ kind: kind as EffectKind, n: (p?.n ?? 0) + 1 }));
-	const color = teamColor ?? "#4ade80";
+	const color = teamColor ?? (theme === "dark" ? "#4ade80" : "#16a34a");
 	const fx = cardEffect(playing?.kind, color);
 	return (
 		<div>

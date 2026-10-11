@@ -1,6 +1,7 @@
 import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
 import { signOut } from "#/server/auth";
 import { Avatar } from "./Avatar";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function AppHeader() {
 	const { user } = useRouteContext({ from: "__root__" });
@@ -25,7 +26,9 @@ export function AppHeader() {
 					</Link>
 				</div>
 				{user ? (
-					<div className="ml-auto flex items-center gap-2 text-sm sm:gap-3">
+					<div className="ml-auto flex items-center gap-1 text-sm sm:gap-2">
+						{/* Phones are short on room here; the profile page has the setting too. */}
+						<ThemeToggle className="hidden sm:block" />
 						<Link
 							to="/profile"
 							aria-label="Your profile"
@@ -50,12 +53,15 @@ export function AppHeader() {
 						</button>
 					</div>
 				) : (
-					<Link
-						to="/login"
-						className="ml-auto flex h-10 items-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105 active:scale-95"
-					>
-						Sign in
-					</Link>
+					<div className="ml-auto flex items-center gap-1 sm:gap-2">
+						<ThemeToggle />
+						<Link
+							to="/login"
+							className="flex h-10 items-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105 active:scale-95"
+						>
+							Sign in
+						</Link>
+					</div>
 				)}
 			</nav>
 		</header>

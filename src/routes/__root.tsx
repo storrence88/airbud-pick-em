@@ -12,7 +12,8 @@ import { MotionConfig } from "motion/react";
 import { AppHeader } from "../components/AppHeader";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { teamByAbbr } from "../lib/nfl/teams";
-import { accentColors } from "../lib/team-colors";
+import { accentVars } from "../lib/team-colors";
+import { themeScript } from "../lib/theme";
 import { getSessionUser, type SessionUser } from "../server/auth";
 import appCss from "../styles.css?url";
 
@@ -32,10 +33,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				content: "width=device-width, initial-scale=1, viewport-fit=cover",
 			},
 			{
-				name: "theme-color",
-				content: "#0b0e14",
-			},
-			{
 				title: "Pick'em",
 			},
 		],
@@ -52,20 +49,23 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 /** Swaps the app accent for your favorite team's color when you've opted in. */
 function teamTheme(user: SessionUser | null) {
 	const team = user?.teamTheme ? teamByAbbr(user.profile.favorite_team) : null;
-	if (!team) return undefined;
-	const { accent, foreground } = accentColors(team);
-	return {
-		"--primary": accent,
-		"--ring": accent,
-		"--primary-foreground": foreground,
-	} as React.CSSProperties;
+	return team ? accentVars(team) : undefined;
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
 	const { user } = useRouteContext({ from: "__root__" });
+	const team = teamTheme(user);
 	return (
-		<html lang="en" className="dark" style={teamTheme(user)}>
+		// The theme script adds the "dark" class before React hydrates.
+		<html
+			lang="en"
+			data-team-theme={team ? "" : undefined}
+			style={team}
+			suppressHydrationWarning
+		>
 			<head>
+				{/* biome-ignore lint/security/noDangerouslySetInnerHtml: static theme script */}
+				<script dangerouslySetInnerHTML={{ __html: themeScript }} />
 				<HeadContent />
 			</head>
 			<body>
