@@ -1,4 +1,4 @@
-import { Check, Lock, Star } from "lucide-react";
+import { Check, Lock, Sparkles, Star } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
@@ -20,6 +20,8 @@ interface Props {
 	/** A result effect to play once; cleared through onEffectDone. */
 	effect?: EffectKind | null;
 	onEffectDone?: () => void;
+	/** Who won by picking against 80%+ of ESPN, once the game is final. */
+	faded?: { crowd: number; names: string[] } | null;
 }
 
 function formatKickoff(iso: string) {
@@ -40,6 +42,7 @@ export function GameCard({
 	lock,
 	effect,
 	onEffectDone,
+	faded,
 }: Props) {
 	const line = lineText === undefined ? game.spreadText : lineText;
 	const locked = game.state !== "pre";
@@ -116,6 +119,7 @@ export function GameCard({
 					split={game.publicPicks}
 				/>
 			)}
+			{faded && <FadedCallout crowd={faded.crowd} names={faded.names} />}
 			{others &&
 			(others[game.away.abbr]?.length || others[game.home.abbr]?.length) ? (
 				<div className="grid grid-cols-2 gap-2 px-3 pb-3 text-xs text-muted-foreground">
@@ -243,6 +247,28 @@ function PublicSplit({
 				/>
 			</div>
 		</div>
+	);
+}
+
+/** A quiet nod to whoever won against a lopsided ESPN crowd. */
+function FadedCallout({ crowd, names }: { crowd: number; names: string[] }) {
+	const who =
+		names.length > 1
+			? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
+			: names[0];
+	return (
+		<motion.p
+			initial={{ opacity: 0, y: 4 }}
+			animate={{ opacity: 1, y: 0 }}
+			transition={{ delay: 0.3, type: "spring", stiffness: 260, damping: 24 }}
+			className="mx-3 mb-3 flex items-start gap-1.5 rounded-md bg-primary/10 px-2.5 py-1.5 text-xs text-muted-foreground"
+		>
+			<Sparkles className="mt-px size-3.5 shrink-0 text-primary" aria-hidden />
+			<span>
+				<span className="font-semibold text-foreground">Faded the public.</span>{" "}
+				{who} won against {crowd}% of ESPN.
+			</span>
+		</motion.p>
 	);
 }
 

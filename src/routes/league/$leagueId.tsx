@@ -20,6 +20,7 @@ import {
 	type RankedPick,
 	settle,
 } from "#/lib/confidence";
+import { fadedThePublic } from "#/lib/faded";
 import type { Game } from "#/lib/nfl/types";
 import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
@@ -431,10 +432,29 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 								];
 							}
 						}
+						const fade = fadedThePublic(
+							g,
+							g.publicPicks,
+							data.picks,
+							league.mode,
+						);
 						return (
 							<GameCard
 								key={g.id}
 								game={g}
+								faded={
+									fade && {
+										crowd: fade.crowd,
+										// You first, then everyone else by name.
+										names: [...fade.userIds]
+											.sort(
+												(a, b) => Number(b === userId) - Number(a === userId),
+											)
+											.map((id) =>
+												id === userId ? "You" : (names.get(id) ?? "Player"),
+											),
+									}
+								}
 								picked={myPick?.team}
 								onPick={(team) => choose(g, team)}
 								lineText={league.mode === "spread" ? lineText(g) : g.spreadText}
