@@ -27,6 +27,7 @@ import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
 import { Standings } from "#/components/Standings";
 import { Tiebreaker } from "#/components/Tiebreaker";
+import { WeekWinnerBanner } from "#/components/WeekLeaderboard";
 import { WeekResults } from "#/components/WeekResults";
 import {
 	type ConfidenceChange,
@@ -133,6 +134,7 @@ function LeaguePage() {
 					)}
 				</div>
 			</div>
+			<WeekWinnerBanner leagueId={leagueId} />
 			<div className="relative mt-6 inline-flex rounded-full border bg-card p-1 text-sm font-semibold">
 				{(["picks", "standings"] as const).map((t) => (
 					<button

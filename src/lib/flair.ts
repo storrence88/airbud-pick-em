@@ -4,7 +4,7 @@
 
 import { pickOutcome, type ScoringSettings, scorePick } from "./scoring";
 import type { FinishedGame } from "./standings";
-import { tiebreakerMisses, weekWinners } from "./tiebreaker";
+import { rankWeek, weekWinners } from "./weekly";
 
 export interface FlairPick {
 	user_id: string;
@@ -154,18 +154,10 @@ export function computeFlair(
 		const ids = played(wk);
 		if (!ids.length) continue;
 		// Ties on points go to the closest Monday night tiebreaker guess.
-		const misses = tiebreakerMisses(
-			picks,
-			games.filter((g) => g.week === wk),
-		);
-		for (const id of weekWinners(
-			ids.map((id) => ({
-				userId: id,
-				points: points(id, wk),
-				miss: misses.get(id) ?? null,
-			})),
+		for (const w of weekWinners(
+			rankWeek(memberIds, picks, games, wk, settings),
 		))
-			weeksWon.set(id, (weeksWon.get(id) ?? 0) + 1);
+			weeksWon.set(w.userId, (weeksWon.get(w.userId) ?? 0) + 1);
 		for (const id of ids) {
 			const pts = points(id, wk);
 			const rec = tallies.get(id)?.weekRecord.get(wk);
