@@ -25,11 +25,13 @@ Other scripts: `npm test` (Vitest), `npm run check` (Biome), `npm run build`.
 1. **Database:** run each file in `supabase/migrations/` in order in the Supabase SQL editor. `0005_profile_flair.sql` also creates the public `avatars` storage bucket for uploaded profile photos.
 2. **Auth redirect:** in Supabase > Authentication > URL Configuration, set the Site URL to your Vercel URL and add `http://localhost:3000/**` and `https://<your-app>.vercel.app/**` as redirect URLs.
 3. **Vercel:** import the repo and set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `CRON_SECRET` (any random string).
+4. **Pick reminder emails (optional):** they're sent from a Gmail account. Turn on 2-Step Verification for it, create an [app password](https://myaccount.google.com/apppasswords), and set `GMAIL_USER` (the address) and `GMAIL_APP_PASSWORD` in Vercel. In GitHub, add the repo secret `CRON_SECRET` (same value as Vercel) and the repo variable `APP_URL` (your Vercel URL); the `Pick reminders` workflow then runs hourly.
 
 ## How data flows
 
 - Games come from ESPN. Opening a week fetches it and saves it to the `games` table (at most once a minute), and a daily Vercel cron hits `/api/sync`.
 - When a game kicks off, its spread is frozen in `locked_spread`; ATS scoring only uses that value.
+- Pick reminders: the `Pick reminders` GitHub Actions workflow calls `/api/reminders` hourly. When a game day's first kickoff is 3 hours out or less, everyone with open picks that day gets one email (or, if they chose Discord DMs on their profile, shows up in the bot's `/api/bot/reminders`). `reminder_log` keeps it to one email per person per game day. Running the workflow by hand defaults to a dry run.
 - Row-level security does the rules: you can only change your picks before kickoff, and you can only see other members' picks once a game has started.
 
 ## Layout
@@ -38,6 +40,7 @@ Other scripts: `npm test` (Vitest), `npm run check` (Biome), `npm run build`.
 - `src/lib/nfl/espn.ts`: ESPN scoreboard provider (tested)
 - `src/lib/standings.ts`: season and weekly standings (tested)
 - `src/lib/flair.ts`: standings badges, streak flame, and last-place trophy (tested)
+- `src/lib/reminders.ts`: when pick reminders are due and their wording (tested)
 - `src/server/`: server functions for auth, leagues, picks and the game sync
 - `supabase/migrations/`: tables, security rules, and the create/join league functions
 - `src/routes/`: home, sign in, my leagues, new league, league (picks + standings), invite links

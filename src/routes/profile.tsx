@@ -1,10 +1,16 @@
 import {
 	useMutation,
+	useQuery,
 	useQueryClient,
 	useSuspenseQuery,
 } from "@tanstack/react-query";
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
-import { Check, ImageUp, Play } from "lucide-react";
+import {
+	createFileRoute,
+	Link,
+	redirect,
+	useRouter,
+} from "@tanstack/react-router";
+import { BarChart3, Check, ChevronRight, ImageUp, Play } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useRef, useState } from "react";
 import { Avatar } from "#/components/Avatar";
@@ -23,9 +29,11 @@ import {
 	WIN_EFFECTS,
 	type WinEffect,
 } from "#/lib/profile";
+import { REMINDER_CHANNELS, type ReminderChannel } from "#/lib/reminders";
 import { supabase } from "#/lib/supabase";
 import { accentColors } from "#/lib/team-colors";
 import { cn } from "#/lib/utils";
+import { myLeaguesQuery } from "#/server/leagues";
 import { myProfileQuery, updateProfile } from "#/server/profile";
 
 export const Route = createFileRoute("/profile")({
@@ -111,6 +119,8 @@ function ProfilePage() {
 					</div>
 				</div>
 			</motion.div>
+
+			<SeasonStatsLinks />
 
 			<Section title="Name and title">
 				<Field label="Display name" htmlFor="name">
@@ -199,11 +209,23 @@ function ProfilePage() {
 			</Section>
 
 			<Section
-				title="Discord bot"
-				hint="How the league's Discord bot treats you in pick reminders."
+				title="Pick reminders"
+				hint="A few hours before each game day's first kickoff, if you still have open picks."
 			>
+				<Segmented
+					label="Remind me by"
+					value={form.reminder_channel}
+					options={REMINDER_CHANNELS}
+					onChange={(v) => set("reminder_channel", v as ReminderChannel)}
+				/>
+				{form.reminder_channel === "discord" && !data.hasDiscord && (
+					<p className="-mt-2 text-sm text-muted-foreground">
+						Sign in with Discord once so the bot can find you. Until then,
+						reminders come by email.
+					</p>
+				)}
 				<Toggle
-					label="@mention me when I haven't picked"
+					label="Let the Discord bot @mention me when I haven't picked"
 					checked={form.bot_mentions}
 					onChange={(v) => set("bot_mentions", v)}
 				/>
@@ -264,6 +286,37 @@ function ProfilePage() {
 				)}
 			</AnimatePresence>
 		</main>
+	);
+}
+
+/** Your stats live per league, since each league scores its own way. */
+function SeasonStatsLinks() {
+	const { user } = Route.useRouteContext();
+	const { data: leagues } = useQuery(myLeaguesQuery());
+	if (!user || !leagues?.length) return null;
+	return (
+		<Section title="Season stats">
+			<ul className="grid gap-2">
+				{leagues.map(({ league }) => (
+					<li key={league.id}>
+						<Link
+							to="/league/$leagueId/stats/$userId"
+							params={{ leagueId: league.id, userId: user.id }}
+							className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-muted"
+						>
+							<BarChart3 className="size-4 shrink-0 text-primary" aria-hidden />
+							<span className="min-w-0 flex-1 truncate font-semibold">
+								{league.name}
+							</span>
+							<ChevronRight
+								className="size-4 shrink-0 text-muted-foreground"
+								aria-hidden
+							/>
+						</Link>
+					</li>
+				))}
+			</ul>
+		</Section>
 	);
 }
 

@@ -124,4 +124,23 @@ describe("computeFlair", () => {
 		expect(f.a.badges.map((b) => b.id)).toContain("worst-week");
 		expect(f.b.badges.map((b) => b.id)).not.toContain("worst-week");
 	});
+
+	it("gives a tied week to the closer Monday night tiebreaker guess", () => {
+		const w1 = [game(1), game(1)]; // last game ends 24-20, 44 total
+		const picks = [
+			pick("a", w1[0], "KC"),
+			{ ...pick("a", w1[1], "BUF"), tiebreaker: 50 },
+			pick("b", w1[0], "KC"),
+			{ ...pick("b", w1[1], "BUF"), tiebreaker: 41 },
+		];
+		const f = computeFlair(
+			["a", "b"],
+			picks,
+			w1,
+			{ 1: { total: 2, final: 2 } },
+			straight,
+		);
+		expect(f.b.badges.map((b) => b.id)).toContain("week-winner");
+		expect(f.a.badges.map((b) => b.id)).not.toContain("week-winner");
+	});
 });

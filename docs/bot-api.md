@@ -82,6 +82,40 @@ Standings tab.
 `points` is the season total. `correct` is the number of correct picks, used to
 break ties. `byWeek` has points per week.
 
+### `GET /reminders?hours=3`
+
+Who to DM a pick reminder right now. It returns people only when a game day's
+first kickoff is within `hours` (default 3, up to 72) and still ahead, and
+only members who chose **Discord DM** under Pick reminders on their profile,
+have signed in with Discord, and still have open picks that day. Everyone else
+gets an email from the app instead, so the bot never needs to email anyone.
+
+```json
+{
+  "slate": { "id": "2026-10-11", "firstKickoff": "2026-10-11T17:00:00.000Z" },
+  "reminders": [
+    {
+      "id": "2026-10-11:234567890123456789",
+      "discordId": "234567890123456789",
+      "displayName": "Nate",
+      "style": "roast",
+      "openGames": [
+        { "id": "401772938", "kickoff": "2026-10-11T17:00:00Z", "away": "BUF", "home": "KC" }
+      ],
+      "message": "Nate, kickoff is <t:1791738000:R> and you've left 1 pick blank. Bold strategy.\nBUF @ KC\nMake your picks: https://<app>/picks"
+    }
+  ]
+}
+```
+
+- `slate` is `null` (and `reminders` empty) when no game day is coming up in
+  the window. A game day is a US Eastern date, so Thursday, Sunday and Monday
+  each get their own reminder.
+- `message` is ready to send as is, already in the person's chosen `style`
+  (`gentle` or `roast`). It only mentions their own open games.
+- `id` is the same for a person all day. Remember the ids you've sent and skip
+  them, so polling every 15 to 30 minutes sends each person one DM per game day.
+
 ### A game
 
 ```json
@@ -102,7 +136,7 @@ break ties. `byWeek` has points per week.
     { "displayName": "Nate", "discordId": "234567890123456789", "team": "BUF", "confidence": 9 }
   ],
   "notPicked": [
-    { "displayName": "Jordan", "discordId": null }
+    { "displayName": "Jordan", "discordId": null, "mention": true }
   ]
 }
 ```
@@ -120,10 +154,13 @@ break ties. `byWeek` has points per week.
 - `confidence` is `null` unless the league uses confidence points.
 - `discordId` is the member's Discord user id once they've signed in to the app
   with Discord, otherwise `null`. Use it to @mention: `<@${discordId}>`.
+- `mention` in `notPicked` is the member's "Let the Discord bot @mention me"
+  setting from their profile. When it's `false`, use their `displayName`
+  instead of pinging them.
 
 ## Errors
 
-Errors are JSON, `{ "error": "message" }`: `400` bad `week`, `401` missing,
+Errors are JSON, `{ "error": "message" }`: `400` bad `week` or `hours`, `401` missing,
 wrong or revoked key, `404` no such game, `500` something broke on our end.
 
 ## discord.js example
@@ -159,9 +196,28 @@ async function standings(interaction) {
 async function remind(channel) {
   const { game } = await get("/games/next");
   if (!game || game.notPicked.length === 0) return;
-  const who = game.notPicked.map((m) => (m.discordId ? `<@${m.discordId}>` : m.displayName));
+  const who = game.notPicked.map((m) =>
+    m.discordId && m.mention ? `<@${m.discordId}>` : m.displayName,
+  );
   await channel.send(
     `${game.away.abbr} @ ${game.home.abbr} kicks off ${time(game.kickoff)}. Still need picks from ${who.join(", ")}.`,
   );
 }
+
+// Pick reminder DMs: poll every 15 to 30 minutes, DM each person once a day
+const sent = new Set(); // keep this somewhere that survives restarts if you can
+async function dmReminders(client) {
+  const { reminders = [] } = await get("/reminders");
+  for (const r of reminders) {
+    if (sent.has(r.id)) continue;
+    try {
+      const user = await client.users.fetch(r.discordId);
+      await user.send(r.message);
+      sent.add(r.id);
+    } catch (err) {
+      console.error("reminder DM failed", r.displayName, err); // DMs closed, etc.
+    }
+  }
+}
+setInterval(() => dmReminders(client), 20 * 60 * 1000);
 ```

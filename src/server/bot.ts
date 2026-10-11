@@ -88,6 +88,8 @@ export interface BotMember {
 	userId: string;
 	displayName: string;
 	discordId: string | null;
+	/** Their profile's "@mention me when I haven't picked" setting. */
+	mention: boolean;
 	role: "commissioner" | "member";
 }
 
@@ -98,7 +100,7 @@ export async function leagueMembers({
 	const [{ data: members }, { data: linked }] = await Promise.all([
 		admin
 			.from("league_members")
-			.select("user_id, role, profiles(display_name)")
+			.select("user_id, role, profiles(display_name, bot_mentions)")
 			.eq("league_id", league.id),
 		admin.rpc("league_discord_ids", { p_league: league.id }),
 	]);
@@ -108,14 +110,19 @@ export async function leagueMembers({
 			r.discord_id,
 		]),
 	);
-	return (members ?? []).map((m) => ({
-		userId: m.user_id,
-		role: m.role,
-		displayName:
-			(m.profiles as unknown as { display_name: string } | null)
-				?.display_name ?? "Player",
-		discordId: discord.get(m.user_id) ?? null,
-	}));
+	return (members ?? []).map((m) => {
+		const p = m.profiles as unknown as {
+			display_name: string;
+			bot_mentions: boolean;
+		} | null;
+		return {
+			userId: m.user_id,
+			role: m.role,
+			displayName: p?.display_name ?? "Player",
+			discordId: discord.get(m.user_id) ?? null,
+			mention: p?.bot_mentions ?? true,
+		};
+	});
 }
 
 export interface PickRow {
@@ -221,7 +228,7 @@ export async function gameViews(ctx: BotContext, games: Game[]) {
 				})),
 			notPicked: members
 				.filter((m) => !picked.has(m.userId))
-				.map((m) => person(m.userId)),
+				.map((m) => ({ ...person(m.userId), mention: m.mention })),
 		};
 	});
 }

@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
 import { BotAccess } from "#/components/BotAccess";
 import { DeleteLeague } from "#/components/DeleteLeague";
+import { EnterPick } from "#/components/EnterPick";
 import { RemoveMember } from "#/components/RemoveMember";
 import { ResetInvite } from "#/components/ResetInvite";
 import { SurvivorSettings } from "#/components/SurvivorSettings";
@@ -61,6 +62,12 @@ function LeagueSettings() {
 			{isCommissioner ? (
 				<>
 					<SettingsForm key={league.id} />
+					<EnterPick
+						leagueId={leagueId}
+						mode={league.mode}
+						members={members}
+						userId={userId}
+					/>
 					<ResetInvite leagueId={leagueId} code={league.invite_code} />
 					<SurvivorSettings leagueId={leagueId} />
 					<BotAccess leagueId={leagueId} />

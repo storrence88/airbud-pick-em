@@ -1,0 +1,36 @@
+# Pick reminders: asks the app every hour whether a game day's first kickoff
+# is a few hours out, and if so it emails anyone with open picks. The app
+# decides who and when and never sends twice, so a late or doubled run is
+# harmless. Kickoffs run from about 13:30 to 01:15 UTC, so hours 9 to 23 UTC
+# cover every game day.
+#
+# Setup (repo Settings > Secrets and variables > Actions):
+#   secret   CRON_SECRET  the same value as CRON_SECRET in Vercel
+#   variable APP_URL      e.g. https://airbud-pick-em.vercel.app
+name: Pick reminders
+
+on:
+  schedule:
+    - cron: "20 9-23 * * *"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "Dry run: only count who would get an email"
+        type: boolean
+        default: true
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ vars.APP_URL != '' }}
+    steps:
+      - name: Send due reminders
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry && '?dry=1' || '' }}
+        run: |
+          curl --fail-with-body -sS --max-time 120 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "${APP_URL%/}/api/reminders$DRY"

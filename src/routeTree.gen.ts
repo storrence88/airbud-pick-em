@@ -13,17 +13,20 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PicksRouteImport } from './routes/picks'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as ApiRemindersRouteImport } from './routes/api/reminders'
 import { Route as ApiSyncRouteImport } from './routes/api/sync'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as JoinCodeRouteImport } from './routes/join/$code'
 import { Route as LeagueLeagueIdRouteImport } from './routes/league/$leagueId'
 import { Route as LeagueNewRouteImport } from './routes/league/new'
 import { Route as LeaguesIndexRouteImport } from './routes/leagues/index'
+import { Route as ApiBotRemindersRouteImport } from './routes/api/bot/reminders'
 import { Route as ApiBotStandingsRouteImport } from './routes/api/bot/standings'
 import { Route as ApiBotWeekRouteImport } from './routes/api/bot/week'
 import { Route as LeagueLeagueIdSettingsRouteImport } from './routes/league/$leagueId_.settings'
 import { Route as LeagueLeagueIdSurvivorRouteImport } from './routes/league/$leagueId_.survivor'
 import { Route as ApiBotGamesGameIdRouteImport } from './routes/api/bot/games/$gameId'
+import { Route as LeagueLeagueIdStatsUserIdRouteImport } from './routes/league/$leagueId_.stats.$userId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -43,6 +46,11 @@ const PicksRoute = PicksRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRemindersRoute = ApiRemindersRouteImport.update({
+  id: '/api/reminders',
+  path: '/api/reminders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSyncRoute = ApiSyncRouteImport.update({
@@ -75,6 +83,11 @@ const LeaguesIndexRoute = LeaguesIndexRouteImport.update({
   path: '/leagues/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBotRemindersRoute = ApiBotRemindersRouteImport.update({
+  id: '/api/bot/reminders',
+  path: '/api/bot/reminders',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBotStandingsRoute = ApiBotStandingsRouteImport.update({
   id: '/api/bot/standings',
   path: '/api/bot/standings',
@@ -100,40 +113,52 @@ const ApiBotGamesGameIdRoute = ApiBotGamesGameIdRouteImport.update({
   path: '/api/bot/games/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LeagueLeagueIdStatsUserIdRoute =
+  LeagueLeagueIdStatsUserIdRouteImport.update({
+    id: '/league/$leagueId_/stats/$userId',
+    path: '/league/$leagueId/stats/$userId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
   '/profile': typeof ProfileRoute
+  '/api/reminders': typeof ApiRemindersRoute
   '/api/sync': typeof ApiSyncRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/join/$code': typeof JoinCodeRoute
   '/league/$leagueId': typeof LeagueLeagueIdRoute
   '/league/new': typeof LeagueNewRoute
   '/leagues/': typeof LeaguesIndexRoute
+  '/api/bot/reminders': typeof ApiBotRemindersRoute
   '/api/bot/standings': typeof ApiBotStandingsRoute
   '/api/bot/week': typeof ApiBotWeekRoute
   '/league/$leagueId/settings': typeof LeagueLeagueIdSettingsRoute
   '/league/$leagueId/survivor': typeof LeagueLeagueIdSurvivorRoute
   '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
+  '/league/$leagueId/stats/$userId': typeof LeagueLeagueIdStatsUserIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
   '/profile': typeof ProfileRoute
+  '/api/reminders': typeof ApiRemindersRoute
   '/api/sync': typeof ApiSyncRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/join/$code': typeof JoinCodeRoute
   '/league/$leagueId': typeof LeagueLeagueIdRoute
   '/league/new': typeof LeagueNewRoute
   '/leagues': typeof LeaguesIndexRoute
+  '/api/bot/reminders': typeof ApiBotRemindersRoute
   '/api/bot/standings': typeof ApiBotStandingsRoute
   '/api/bot/week': typeof ApiBotWeekRoute
   '/league/$leagueId/settings': typeof LeagueLeagueIdSettingsRoute
   '/league/$leagueId/survivor': typeof LeagueLeagueIdSurvivorRoute
   '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
+  '/league/$leagueId/stats/$userId': typeof LeagueLeagueIdStatsUserIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -141,17 +166,20 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
   '/profile': typeof ProfileRoute
+  '/api/reminders': typeof ApiRemindersRoute
   '/api/sync': typeof ApiSyncRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/join/$code': typeof JoinCodeRoute
   '/league/$leagueId': typeof LeagueLeagueIdRoute
   '/league/new': typeof LeagueNewRoute
   '/leagues/': typeof LeaguesIndexRoute
+  '/api/bot/reminders': typeof ApiBotRemindersRoute
   '/api/bot/standings': typeof ApiBotStandingsRoute
   '/api/bot/week': typeof ApiBotWeekRoute
   '/league/$leagueId_/settings': typeof LeagueLeagueIdSettingsRoute
   '/league/$leagueId_/survivor': typeof LeagueLeagueIdSurvivorRoute
   '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
+  '/league/$leagueId_/stats/$userId': typeof LeagueLeagueIdStatsUserIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -160,51 +188,60 @@ export interface FileRouteTypes {
     | '/login'
     | '/picks'
     | '/profile'
+    | '/api/reminders'
     | '/api/sync'
     | '/auth/callback'
     | '/join/$code'
     | '/league/$leagueId'
     | '/league/new'
     | '/leagues/'
+    | '/api/bot/reminders'
     | '/api/bot/standings'
     | '/api/bot/week'
     | '/league/$leagueId/settings'
     | '/league/$leagueId/survivor'
     | '/api/bot/games/$gameId'
+    | '/league/$leagueId/stats/$userId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/picks'
     | '/profile'
+    | '/api/reminders'
     | '/api/sync'
     | '/auth/callback'
     | '/join/$code'
     | '/league/$leagueId'
     | '/league/new'
     | '/leagues'
+    | '/api/bot/reminders'
     | '/api/bot/standings'
     | '/api/bot/week'
     | '/league/$leagueId/settings'
     | '/league/$leagueId/survivor'
     | '/api/bot/games/$gameId'
+    | '/league/$leagueId/stats/$userId'
   id:
     | '__root__'
     | '/'
     | '/login'
     | '/picks'
     | '/profile'
+    | '/api/reminders'
     | '/api/sync'
     | '/auth/callback'
     | '/join/$code'
     | '/league/$leagueId'
     | '/league/new'
     | '/leagues/'
+    | '/api/bot/reminders'
     | '/api/bot/standings'
     | '/api/bot/week'
     | '/league/$leagueId_/settings'
     | '/league/$leagueId_/survivor'
     | '/api/bot/games/$gameId'
+    | '/league/$leagueId_/stats/$userId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -212,17 +249,20 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PicksRoute: typeof PicksRoute
   ProfileRoute: typeof ProfileRoute
+  ApiRemindersRoute: typeof ApiRemindersRoute
   ApiSyncRoute: typeof ApiSyncRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   JoinCodeRoute: typeof JoinCodeRoute
   LeagueLeagueIdRoute: typeof LeagueLeagueIdRoute
   LeagueNewRoute: typeof LeagueNewRoute
   LeaguesIndexRoute: typeof LeaguesIndexRoute
+  ApiBotRemindersRoute: typeof ApiBotRemindersRoute
   ApiBotStandingsRoute: typeof ApiBotStandingsRoute
   ApiBotWeekRoute: typeof ApiBotWeekRoute
   LeagueLeagueIdSettingsRoute: typeof LeagueLeagueIdSettingsRoute
   LeagueLeagueIdSurvivorRoute: typeof LeagueLeagueIdSurvivorRoute
   ApiBotGamesGameIdRoute: typeof ApiBotGamesGameIdRoute
+  LeagueLeagueIdStatsUserIdRoute: typeof LeagueLeagueIdStatsUserIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -253,6 +293,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/reminders': {
+      id: '/api/reminders'
+      path: '/api/reminders'
+      fullPath: '/api/reminders'
+      preLoaderRoute: typeof ApiRemindersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sync': {
@@ -297,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeaguesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/bot/reminders': {
+      id: '/api/bot/reminders'
+      path: '/api/bot/reminders'
+      fullPath: '/api/bot/reminders'
+      preLoaderRoute: typeof ApiBotRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/bot/standings': {
       id: '/api/bot/standings'
       path: '/api/bot/standings'
@@ -332,6 +386,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBotGamesGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/league/$leagueId_/stats/$userId': {
+      id: '/league/$leagueId_/stats/$userId'
+      path: '/league/$leagueId/stats/$userId'
+      fullPath: '/league/$leagueId/stats/$userId'
+      preLoaderRoute: typeof LeagueLeagueIdStatsUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -340,17 +401,20 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PicksRoute: PicksRoute,
   ProfileRoute: ProfileRoute,
+  ApiRemindersRoute: ApiRemindersRoute,
   ApiSyncRoute: ApiSyncRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   JoinCodeRoute: JoinCodeRoute,
   LeagueLeagueIdRoute: LeagueLeagueIdRoute,
   LeagueNewRoute: LeagueNewRoute,
   LeaguesIndexRoute: LeaguesIndexRoute,
+  ApiBotRemindersRoute: ApiBotRemindersRoute,
   ApiBotStandingsRoute: ApiBotStandingsRoute,
   ApiBotWeekRoute: ApiBotWeekRoute,
   LeagueLeagueIdSettingsRoute: LeagueLeagueIdSettingsRoute,
   LeagueLeagueIdSurvivorRoute: LeagueLeagueIdSurvivorRoute,
   ApiBotGamesGameIdRoute: ApiBotGamesGameIdRoute,
+  LeagueLeagueIdStatsUserIdRoute: LeagueLeagueIdStatsUserIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
