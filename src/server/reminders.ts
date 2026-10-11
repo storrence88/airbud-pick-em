@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createTransport, type Transporter } from "nodemailer";
 import type { Game } from "#/lib/nfl/types";
 import type { ReminderStyle } from "#/lib/profile";
 import {
@@ -92,32 +93,34 @@ const escapeHtml = (s: string) =>
 			] as string,
 	);
 
-/** Sends one email through Resend's HTTP API. */
+let mailer: Transporter | undefined;
+
+/**
+ * Sends one email from a Gmail account over SMTP, signed in with a Google
+ * app password. Gmail allows about 500 a day, plenty for a league of friends.
+ */
 async function sendEmail(
 	to: string,
 	subject: string,
 	text: string,
 	html: string,
 ) {
-	const res = await fetch("https://api.resend.com/emails", {
-		method: "POST",
-		headers: {
-			Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-			"Content-Type": "application/json",
-		},
-		body: JSON.stringify({
-			from: process.env.REMINDER_EMAIL_FROM,
-			to,
-			subject,
-			text,
-			html,
-		}),
+	const user = process.env.GMAIL_USER as string;
+	mailer ??= createTransport({
+		service: "gmail",
+		auth: { user, pass: process.env.GMAIL_APP_PASSWORD },
 	});
-	if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
+	await mailer.sendMail({
+		from: { name: "Pick'em", address: user },
+		to,
+		subject,
+		text,
+		html,
+	});
 }
 
 export const emailConfigured = () =>
-	Boolean(process.env.RESEND_API_KEY && process.env.REMINDER_EMAIL_FROM);
+	Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 
 /**
  * The scheduled email job. When a game day's first kickoff is a few hours

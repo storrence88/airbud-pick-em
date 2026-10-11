@@ -25,7 +25,7 @@ Other scripts: `npm test` (Vitest), `npm run check` (Biome), `npm run build`.
 1. **Database:** run each file in `supabase/migrations/` in order in the Supabase SQL editor. `0005_profile_flair.sql` also creates the public `avatars` storage bucket for uploaded profile photos.
 2. **Auth redirect:** in Supabase > Authentication > URL Configuration, set the Site URL to your Vercel URL and add `http://localhost:3000/**` and `https://<your-app>.vercel.app/**` as redirect URLs.
 3. **Vercel:** import the repo and set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `CRON_SECRET` (any random string).
-4. **Pick reminder emails (optional):** set `RESEND_API_KEY` and `REMINDER_EMAIL_FROM` (like `Pick'em <picks@yourdomain.com>`, on a domain verified in [Resend](https://resend.com)) in Vercel. In GitHub, add the repo secret `CRON_SECRET` (same value as Vercel) and the repo variable `APP_URL` (your Vercel URL); the `Pick reminders` workflow then runs hourly.
+4. **Pick reminder emails (optional):** they're sent from a Gmail account. Turn on 2-Step Verification for it, create an [app password](https://myaccount.google.com/apppasswords), and set `GMAIL_USER` (the address) and `GMAIL_APP_PASSWORD` in Vercel. In GitHub, add the repo secret `CRON_SECRET` (same value as Vercel) and the repo variable `APP_URL` (your Vercel URL); the `Pick reminders` workflow then runs hourly.
 
 ## How data flows
 
