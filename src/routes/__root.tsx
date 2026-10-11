@@ -15,6 +15,7 @@ import { ServiceWorker } from "../components/ServiceWorker";
 import { WhatsNew } from "../components/WhatsNew";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { teamByAbbr } from "../lib/nfl/teams";
+import { seedOnboarding } from "../lib/onboarding";
 import { accentVars } from "../lib/team-colors";
 import { themeScript } from "../lib/theme";
 import { getSessionUser, type SessionUser } from "../server/auth";
@@ -72,6 +73,8 @@ function teamTheme(user: SessionUser | null) {
 function RootDocument({ children }: { children: React.ReactNode }) {
 	const { user } = useRouteContext({ from: "__root__" });
 	const team = teamTheme(user);
+	// Before anything reads it, so the first render already knows what they've seen.
+	seedOnboarding(user);
 	return (
 		// The theme script adds the "dark" class before React hydrates.
 		<html

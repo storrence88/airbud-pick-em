@@ -32,7 +32,7 @@ export function RookieChecklist({
 		setPhone(window.matchMedia("(pointer: coarse)").matches);
 	}, []);
 
-	if (!user || !me || isVeteran(user) || state.rookie?.[user.id]) return null;
+	if (!user || !me || isVeteran(user, state) || state.rookie) return null;
 	const tasks = rookieTasks({
 		picks,
 		hasLock,
@@ -46,7 +46,7 @@ export function RookieChecklist({
 	const close = (how: "done" | "dismissed") =>
 		updateOnboarding((s) => ({
 			...s,
-			rookie: { ...s.rookie, [user.id]: how },
+			rookie: how,
 		}));
 	const C = 2 * Math.PI * 20;
 

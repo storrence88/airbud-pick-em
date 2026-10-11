@@ -11,6 +11,7 @@ import {
 	RELEASE,
 	readOnboarding,
 	updateOnboarding,
+	useOnboarding,
 } from "#/lib/onboarding";
 import { cn } from "#/lib/utils";
 
@@ -80,7 +81,8 @@ export function WhatsNew() {
 	const { user } = useRouteContext({ from: "__root__" });
 	const path = useRouterState({ select: (s) => s.location.pathname });
 	const [open, setOpen] = useState(false);
-	const veteran = isVeteran(user);
+	const state = useOnboarding();
+	const veteran = isVeteran(user, state);
 	const quietPage = path === "/practice" || path.startsWith("/login");
 
 	useEffect(() => onReopenWhatsNew(() => setOpen(true)), []);

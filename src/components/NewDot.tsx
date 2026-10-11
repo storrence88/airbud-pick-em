@@ -17,7 +17,7 @@ import { cn } from "#/lib/utils";
 export function useNewDot(id: DotId, enabled = true) {
 	const { user } = useRouteContext({ from: "__root__" });
 	const state = useOnboarding();
-	const show = enabled && isVeteran(user) && dotVisible(state, id);
+	const show = enabled && isVeteran(user, state) && dotVisible(state, id);
 	useEffect(() => {
 		if (show) startDots();
 	}, [show]);

@@ -1,8 +1,10 @@
-// What this device has already seen of the onboarding: the What's new cards,
-// the practice week, the "new" dots and the Rookie checklist. Kept on the
-// device only (no migration); clearing site data just shows things again.
+// What a player has already seen of the onboarding: the What's new cards,
+// the practice week, the "new" dots and the Rookie checklist. Saved on their
+// profile (profiles.onboarding), so it follows them across devices and can be
+// reset from the SQL editor.
 
 import { useSyncExternalStore } from "react";
+import { saveOnboarding } from "#/server/profile";
 
 /** Bump when there's a new set of What's new cards. */
 export const RELEASE = "2026-10-11";
@@ -22,53 +24,58 @@ export type DotId =
 	| "reminders";
 
 export interface OnboardingState {
+	/** Overrides the account-age rule, for testing: "new" gets the practice week. */
+	player?: "new" | "veteran";
 	/** Release whose What's new cards were seen. */
 	whatsNew?: string;
-	/** Finished or skipped the practice week. */
+	/** The practice week was offered, finished or skipped. */
 	practice?: boolean;
 	/** Dots for one release: when they first showed and which were tapped. */
 	dots?: { release: string; since: number; seen: DotId[] };
-	/** Rookie checklist by user id. */
-	rookie?: Record<string, "done" | "dismissed">;
+	/** The Rookie checklist was finished or hidden. */
+	rookie?: "done" | "dismissed";
 	/** Opened from the home screen at least once. */
 	installed?: boolean;
 }
 
-const KEY = "pickem:onboarding";
 const EMPTY: OnboardingState = {};
-let cache: OnboardingState | null = null;
+// The signed-in player's state, seeded from their profile on load and saved
+// back to it on every change. Browser only: the server never keeps it.
+let cache: OnboardingState = EMPTY;
+let owner: string | null = null;
 const listeners = new Set<() => void>();
+
+/** Loads the player's saved state; a no-op on the server or for the same player. */
+export function seedOnboarding(
+	user: { id: string; onboarding?: OnboardingState } | null,
+) {
+	if (typeof window === "undefined") return;
+	const id = user?.id ?? null;
+	if (id === owner) return;
+	owner = id;
+	cache = user?.onboarding ?? EMPTY;
+}
 
 /** The saved state right now, for effects and handlers. */
 export function readOnboarding(): OnboardingState {
-	if (cache) return cache;
-	try {
-		cache = JSON.parse(localStorage.getItem(KEY) ?? "{}") ?? {};
-	} catch {
-		cache = {};
-	}
-	return cache as OnboardingState;
+	return typeof window === "undefined" ? EMPTY : cache;
 }
 
 export function updateOnboarding(fn: (s: OnboardingState) => OnboardingState) {
-	cache = fn(readOnboarding());
-	try {
-		localStorage.setItem(KEY, JSON.stringify(cache));
-	} catch {}
+	const next = fn(cache);
+	if (next === cache) return;
+	cache = next;
 	for (const l of listeners) l();
+	if (owner)
+		saveOnboarding({ data: next }).catch(() => {
+			// Worst case it shows again next time; not worth bothering anyone.
+		});
 }
 
 function subscribe(l: () => void) {
 	listeners.add(l);
-	const onStorage = (e: StorageEvent) => {
-		if (e.key !== KEY) return;
-		cache = null;
-		l();
-	};
-	window.addEventListener("storage", onStorage);
 	return () => {
 		listeners.delete(l);
-		window.removeEventListener("storage", onStorage);
 	};
 }
 
@@ -77,10 +84,18 @@ export function useOnboarding(): OnboardingState {
 	return useSyncExternalStore(subscribe, readOnboarding, () => EMPTY);
 }
 
-/** True for accounts made before the practice week existed. */
-export function isVeteran(user: { createdAt?: string } | null | undefined) {
+/**
+ * True for players who were around before the practice week existed, by
+ * account age unless their profile says otherwise.
+ */
+export function isVeteran(
+	user: { createdAt?: string } | null | undefined,
+	state: OnboardingState = readOnboarding(),
+) {
+	if (!user) return false;
+	if (state.player) return state.player === "veteran";
 	return (
-		!!user?.createdAt &&
+		!!user.createdAt &&
 		Date.parse(user.createdAt) < Date.parse(NEW_PLAYERS_SINCE)
 	);
 }
