@@ -9,6 +9,7 @@ import { cn } from "#/lib/utils";
 import { rankWeek, type WeekRow, weekWinners } from "#/lib/weekly";
 import { leagueWeekQuery, standingsQuery } from "#/server/leagues";
 import { Avatar } from "./Avatar";
+import { RowsSkeleton } from "./Skeleton";
 
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
@@ -57,9 +58,12 @@ export function WeekWinnerBanner({ leagueId }: { leagueId: string }) {
 				<motion.div
 					initial={{ opacity: 0, y: -6 }}
 					animate={{ opacity: 1, y: 0 }}
-					className="mt-5 flex items-center gap-3 rounded-xl border border-amber-300/30 bg-gradient-to-r from-amber-300/10 to-transparent px-3 py-2.5 sm:px-4"
+					className="mt-5 flex items-center gap-3 rounded-xl border border-amber-500/40 dark:border-amber-300/30 bg-gradient-to-r from-amber-300/25 dark:from-amber-300/10 to-transparent px-3 py-2.5 sm:px-4"
 				>
-					<Crown className="size-5 shrink-0 text-amber-300" aria-hidden />
+					<Crown
+						className="size-5 shrink-0 text-amber-600 dark:text-amber-300"
+						aria-hidden
+					/>
 					<div className="flex shrink-0 -space-x-2">
 						{result.winners.slice(0, 3).map((w) => {
 							const m = members.get(w.userId);
@@ -74,7 +78,7 @@ export function WeekWinnerBanner({ leagueId }: { leagueId: string }) {
 						})}
 					</div>
 					<div className="min-w-0 text-sm">
-						<div className="text-[11px] font-semibold uppercase tracking-wider text-amber-300">
+						<div className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-300">
 							Week {result.wk}{" "}
 							{result.winners.length > 1 ? "co-winners" : "winner"}
 						</div>
@@ -121,8 +125,7 @@ export function WeekLeaderboard({ leagueId }: { leagueId: string }) {
 		};
 	}, [data, week, wk, settings]);
 
-	if (isLoading)
-		return <p className="text-muted-foreground">Loading this week…</p>;
+	if (isLoading) return <RowsSkeleton />;
 	if (!data || wk == null)
 		return (
 			<p className="text-sm text-muted-foreground">
@@ -267,7 +270,8 @@ function WeekRowItem({
 			className={cn(
 				"flex items-center gap-3 rounded-lg border bg-card px-3 py-3 sm:gap-4 sm:px-4",
 				me && "border-primary",
-				winner && "bg-gradient-to-r from-amber-300/10 to-card",
+				winner &&
+					"bg-gradient-to-r from-amber-300/25 dark:from-amber-300/10 to-card",
 				idle && "bg-transparent text-muted-foreground",
 			)}
 		>
@@ -284,7 +288,10 @@ function WeekRowItem({
 					<span className="truncate font-semibold">{profile.display_name}</span>
 					{winner && (
 						<span title="Won the week" className="inline-flex shrink-0">
-							<Crown className="size-4 text-amber-300" aria-hidden />
+							<Crown
+								className="size-4 text-amber-600 dark:text-amber-300"
+								aria-hidden
+							/>
 							<span className="sr-only">Won the week</span>
 						</span>
 					)}

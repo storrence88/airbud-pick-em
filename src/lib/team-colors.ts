@@ -1,9 +1,11 @@
-// Picks readable, distinct bar colors for two teams on the dark game card.
-// Works from each team's primary and alternate colors, so nothing needs to
-// know the schedule ahead of time.
+// Picks readable, distinct bar colors for two teams on the game card, in
+// either theme. Works from each team's primary and alternate colors, so
+// nothing needs to know the schedule ahead of time.
 
-/** Roughly the card background (oklch(0.2 0.018 260)). */
-const CARD_BG = "#181b22";
+export type Theme = "light" | "dark";
+
+/** Roughly the card background: oklch(0.2 0.018 260) dark, white light. */
+const CARD_BG: Record<Theme, string> = { dark: "#181b22", light: "#ffffff" };
 /** Below this contrast with the card, a bar fades into the background. */
 const MIN_CONTRAST = 1.5;
 /** Below this distance (CIE76 ΔE), two bars read as the same color. */
@@ -69,26 +71,34 @@ export function colorDistance(a: string, b: string) {
 	return Math.hypot(la[0] - lb[0], la[1] - lb[1], la[2] - lb[2]);
 }
 
-const readable = (c: string) => contrast(c, CARD_BG) >= MIN_CONTRAST;
+const readable = (c: string, theme: Theme) =>
+	contrast(c, CARD_BG[theme]) >= MIN_CONTRAST;
 
-function mix(hex: string, t: number) {
+/** Mixes toward white, or toward black when `to` is "#000000". */
+function mix(hex: string, t: number, to = "#ffffff") {
 	const rgb = toRgb(hex);
-	return rgb ? toHex(rgb.map((v) => v + (255 - v) * t) as Rgb) : "#9ca3af";
+	const target = toRgb(to) ?? [255, 255, 255];
+	return rgb
+		? toHex(rgb.map((v, i) => v + (target[i] - v) * t) as Rgb)
+		: "#9ca3af";
 }
 
-/** Mixes toward white until the color stands out on the card. */
-function lighten(hex: string) {
+/** Away from the background: white on dark, black on light. */
+const away = (theme: Theme) => (theme === "dark" ? "#ffffff" : "#000000");
+
+/** Mixes away from the background until the color stands out on the card. */
+function strengthen(hex: string, theme: Theme) {
 	for (let t = 0.1; t < 1; t += 0.1) {
-		const mixed = mix(hex, t);
-		if (readable(mixed)) return mixed;
+		const mixed = mix(hex, t, away(theme));
+		if (readable(mixed, theme)) return mixed;
 	}
-	return "#ffffff";
+	return away(theme);
 }
 
 /** The team's colors that show up on the card, primary first. */
-function options(primary: string, alt: string) {
-	const usable = [primary, alt].filter((c) => toRgb(c) && readable(c));
-	return usable.length ? usable : [lighten(primary)];
+function options(primary: string, alt: string, theme: Theme) {
+	const usable = [primary, alt].filter((c) => toRgb(c) && readable(c, theme));
+	return usable.length ? usable : [strengthen(primary, theme)];
 }
 
 export interface TeamColors {
@@ -98,12 +108,17 @@ export interface TeamColors {
 
 /**
  * Chooses one bar color per team: primary when it's readable, otherwise the
- * alternate, otherwise a lightened primary. If both picks look alike, tries
- * the home team's other color, then the away team's.
+ * alternate, otherwise a lightened (or, in light mode, darkened) primary. If
+ * both picks look alike, tries the home team's other color, then the away
+ * team's.
  */
-export function splitColors(away: TeamColors, home: TeamColors) {
-	const a = options(away.color, away.altColor);
-	const h = options(home.color, home.altColor);
+export function splitColors(
+	awayTeam: TeamColors,
+	home: TeamColors,
+	theme: Theme = "dark",
+) {
+	const a = options(awayTeam.color, awayTeam.altColor, theme);
+	const h = options(home.color, home.altColor, theme);
 	const distinct = (x: string, y: string) =>
 		colorDistance(x, y) >= MIN_DISTANCE;
 	for (const [ac, hc] of [
@@ -116,31 +131,47 @@ export function splitColors(away: TeamColors, home: TeamColors) {
 	}
 	// Every pairing clashes: keep away's color and wash out home's so the
 	// split still shows.
-	return { away: a[0], home: mix(h[0], 0.5) };
+	return { away: a[0], home: mix(h[0], 0.5, away(theme)) };
 }
 
-/** Roughly the page background (oklch(0.15 0.015 260)). */
-const PAGE_BG = "#0f1218";
+/** Roughly the page background: oklch(0.15 0.015 260) dark, 0.985 light. */
+const PAGE_BG: Record<Theme, string> = { dark: "#0f1218", light: "#f9fafb" };
 /** Accent text and buttons need more contrast than a thin bar does. */
 const MIN_ACCENT_CONTRAST = 3;
 
 /**
  * A team's color as the app accent: primary or alternate, whichever reads
- * on the page, else primary lightened until it does. Comes with a text
- * color for buttons filled with it.
+ * on the page, else primary pushed away from the background until it does.
+ * Comes with a text color for buttons filled with it.
  */
-export function accentColors(team: TeamColors) {
+export function accentColors(team: TeamColors, theme: Theme = "dark") {
 	const ok = (c: string) =>
-		toRgb(c) && contrast(c, PAGE_BG) >= MIN_ACCENT_CONTRAST;
+		toRgb(c) && contrast(c, PAGE_BG[theme]) >= MIN_ACCENT_CONTRAST;
 	let accent = [team.color, team.altColor].find(ok);
 	for (let t = 0.1; !accent && t < 1; t += 0.1) {
-		const mixed = mix(team.color, t);
+		const mixed = mix(team.color, t, away(theme));
 		if (ok(mixed)) accent = mixed;
 	}
-	accent ??= "#ffffff";
+	accent ??= away(theme);
 	const foreground =
-		contrast(accent, PAGE_BG) >= contrast(accent, "#ffffff")
-			? PAGE_BG
+		contrast(accent, PAGE_BG.dark) >= contrast(accent, "#ffffff")
+			? PAGE_BG.dark
 			: "#ffffff";
 	return { accent, foreground };
+}
+
+/**
+ * A team's accent in both themes as CSS variables. Pair with the
+ * `team-accent` class, which resolves them to `--tc` / `--tc-fg` for
+ * whichever theme is showing, so server-rendered markup never has to know.
+ */
+export function accentVars(team: TeamColors) {
+	const light = accentColors(team, "light");
+	const dark = accentColors(team, "dark");
+	return {
+		"--tc-light": light.accent,
+		"--tc-dark": dark.accent,
+		"--tc-fg-light": light.foreground,
+		"--tc-fg-dark": dark.foreground,
+	} as React.CSSProperties;
 }

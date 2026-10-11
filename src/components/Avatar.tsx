@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { teamByAbbr } from "#/lib/nfl/teams";
 import { initials, type PublicProfile } from "#/lib/profile";
-import { accentColors } from "#/lib/team-colors";
+import { accentVars } from "#/lib/team-colors";
 import { cn } from "#/lib/utils";
 
 type AvatarProfile = Pick<
@@ -25,7 +25,6 @@ export function Avatar({
 	const [broken, setBroken] = useState<string | null>(null);
 	const img = useRef<HTMLImageElement>(null);
 	const team = teamByAbbr(profile.favorite_team);
-	const ring = team ? accentColors(team).accent : null;
 	const src =
 		profile.avatar_kind === "photo" && profile.avatar_url !== broken
 			? profile.avatar_url
@@ -40,14 +39,17 @@ export function Avatar({
 		<span
 			className={cn(
 				"relative inline-grid shrink-0 select-none place-items-center overflow-hidden rounded-full",
-				ring && "ring-2 ring-offset-2 ring-offset-background",
+				team && "team-accent ring-2 ring-offset-2 ring-offset-background",
 				className,
 			)}
 			style={{
 				width: size,
 				height: size,
 				// Tailwind's ring color can't be set from data, so set its variable.
-				["--tw-ring-color" as string]: ring ?? undefined,
+				...(team && {
+					...accentVars(team),
+					["--tw-ring-color" as string]: "var(--tc)",
+				}),
 			}}
 		>
 			{src ? (

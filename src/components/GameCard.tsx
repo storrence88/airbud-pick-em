@@ -1,9 +1,11 @@
-import { Check, Lock, PencilLine, Sparkles, Star } from "lucide-react";
+import { Check, Info, Lock, PencilLine, Sparkles, Star } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
 import { accentColors, splitColors } from "#/lib/team-colors";
+import { useResolvedTheme } from "#/lib/theme";
 import { cn } from "#/lib/utils";
+import { GameDetailsSheet } from "./GameDetails";
 import { cardEffect, type EffectKind, PickEffect } from "./PickEffect";
 
 interface Props {
@@ -24,6 +26,8 @@ interface Props {
 	onEffectDone?: () => void;
 	/** Who won by picking against 80%+ of ESPN, once the game is final. */
 	faded?: { crowd: number; names: string[] } | null;
+	/** Home line frozen at kickoff, shown in the details sheet for ATS leagues. */
+	lockedSpread?: number | null;
 }
 
 function formatKickoff(iso: string) {
@@ -46,7 +50,9 @@ export function GameCard({
 	effect,
 	onEffectDone,
 	faded,
+	lockedSpread,
 }: Props) {
+	const [details, setDetails] = useState(false);
 	const line = lineText === undefined ? game.spreadText : lineText;
 	const locked = game.state !== "pre";
 	// Once a game is final the losing side fades back so the result reads at a glance.
@@ -59,10 +65,14 @@ export function GameCard({
 			: picked === game.away.abbr
 				? game.away
 				: null;
+	const theme = useResolvedTheme();
 	const effectColors = pickedTeam
-		? [accentColors(pickedTeam).accent, pickedTeam.altColor]
+		? [accentColors(pickedTeam, theme).accent, pickedTeam.altColor]
 		: [];
-	const cardFx = cardEffect(effect, effectColors[0] ?? "#ffffff");
+	const cardFx = cardEffect(
+		effect,
+		effectColors[0] ?? (theme === "dark" ? "#ffffff" : "#000000"),
+	);
 	return (
 		<motion.article
 			initial={{ opacity: 0, y: 16 }}
@@ -91,6 +101,15 @@ export function GameCard({
 						<LockToggle on={lock.on} locked={locked} onToggle={lock.onToggle} />
 					)}
 					{line && <span>{line}</span>}
+					<button
+						type="button"
+						onClick={() => setDetails(true)}
+						aria-label={`${game.away.abbr} at ${game.home.abbr} details`}
+						title="Injuries, weather and line movement"
+						className="-my-1 -mr-1.5 grid size-7 place-items-center rounded-full transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<Info className="size-4" aria-hidden />
+					</button>
 				</span>
 			</div>
 			<div className="grid grid-cols-2 gap-2 p-3">
@@ -137,6 +156,12 @@ export function GameCard({
 				</p>
 			)}
 			{footer}
+			<GameDetailsSheet
+				game={game}
+				open={details}
+				onClose={() => setDetails(false)}
+				lockedSpread={lockedSpread}
+			/>
 			{effect && onEffectDone && (
 				<PickEffect
 					key={effect}
@@ -177,7 +202,7 @@ function LockToggle({
 	const style = cn(
 		"-my-1 inline-flex h-7 items-center gap-1 rounded-full border px-2.5 font-semibold transition-colors",
 		on
-			? "border-amber-400/50 bg-amber-400/15 text-amber-300"
+			? "border-amber-500/50 bg-amber-400/15 text-amber-700 dark:border-amber-400/50 dark:text-amber-300"
 			: "border-border text-muted-foreground hover:text-foreground",
 	);
 	if (locked) return <span className={style}>{content}</span>;
@@ -222,7 +247,10 @@ function PublicSplit({
 	home: Team;
 	split: PublicPicks;
 }) {
-	const colors = splitColors(away, home);
+	// Both themes' colors go out as variables; CSS shows the right pair, so
+	// server-rendered bars match whichever theme the page loads in.
+	const light = splitColors(away, home, "light");
+	const dark = splitColors(away, home, "dark");
 	return (
 		<div
 			className="px-3 pb-3"
@@ -239,17 +267,25 @@ function PublicSplit({
 					<span className="font-semibold text-foreground">{split.home}%</span>
 				</span>
 			</div>
-			<div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-muted">
+			<div
+				className="flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-muted"
+				style={
+					{
+						"--away-light": light.away,
+						"--away-dark": dark.away,
+						"--home-light": light.home,
+						"--home-dark": dark.home,
+					} as React.CSSProperties
+				}
+			>
 				<motion.span
-					className="h-full rounded-l-full"
-					style={{ background: colors.away }}
+					className="h-full rounded-l-full bg-(--away-light) dark:bg-(--away-dark)"
 					initial={{ width: 0 }}
 					animate={{ width: `${split.away}%` }}
 					transition={{ type: "spring", stiffness: 120, damping: 20 }}
 				/>
 				<motion.span
-					className="ml-auto h-full rounded-r-full"
-					style={{ background: colors.home }}
+					className="ml-auto h-full rounded-r-full bg-(--home-light) dark:bg-(--home-dark)"
 					initial={{ width: 0 }}
 					animate={{ width: `${split.home}%` }}
 					transition={{ type: "spring", stiffness: 120, damping: 20 }}
