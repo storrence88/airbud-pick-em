@@ -13,6 +13,7 @@ import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
 import { Standings } from "#/components/Standings";
+import { Tiebreaker } from "#/components/Tiebreaker";
 import {
 	type ConfidenceChange,
 	forfeited,
@@ -23,6 +24,7 @@ import {
 import { enteredNote } from "#/lib/entered";
 import type { Game } from "#/lib/nfl/types";
 import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
+import { tiebreakerGameId } from "#/lib/tiebreaker";
 import { cn } from "#/lib/utils";
 import {
 	leagueWeekQuery,
@@ -30,6 +32,7 @@ import {
 	savePick,
 	setConfidence,
 	setLock,
+	setTiebreaker,
 } from "#/server/leagues";
 import { myProfileQuery } from "#/server/profile";
 
@@ -216,6 +219,7 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 					team: vars.team,
 					confidence: vars.confidence,
 					is_lock: mine.get(vars.gameId)?.is_lock ?? false,
+					tiebreaker: mine.get(vars.gameId)?.tiebreaker ?? null,
 					// Choosing a team yourself clears the commissioner's note.
 					entered_by:
 						mine.get(vars.gameId)?.team === vars.team
@@ -284,6 +288,25 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 		onError: (err) => setError((err as Error).message),
 		onSettled: () => qc.invalidateQueries({ queryKey: query.queryKey }),
 	});
+	const tiebreaker = useMutation({
+		mutationFn: (vars: { gameId: string; points: number | null }) =>
+			setTiebreaker({ data: { leagueId, ...vars } }),
+		onMutate: async (vars) => {
+			setError("");
+			await qc.cancelQueries({ queryKey: query.queryKey });
+			updatePicks((picks) =>
+				picks.map((p) =>
+					p.user_id === userId && p.game_id === vars.gameId
+						? { ...p, tiebreaker: vars.points }
+						: p,
+				),
+			);
+		},
+		onError: (err) => setError((err as Error).message),
+		onSettled: () => qc.invalidateQueries({ queryKey: query.queryKey }),
+	});
+	const tbGame = games.find((g) => g.id === tiebreakerGameId(games));
+
 	// Your lock can't move once its game kicks off.
 	const lockInPlay = games.some(
 		(g) => g.state !== "pre" && mine.get(g.id)?.is_lock,
@@ -491,6 +514,28 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 					/>
 				)}
 			</div>
+			{tbGame && (
+				<Tiebreaker
+					game={tbGame}
+					picked={mine.has(tbGame.id)}
+					guess={mine.get(tbGame.id)?.tiebreaker ?? null}
+					others={data.picks.flatMap((p) =>
+						p.game_id === tbGame.id &&
+						p.user_id !== userId &&
+						p.tiebreaker != null
+							? [
+									{
+										userId: p.user_id,
+										name: names.get(p.user_id) ?? "Player",
+										guess: p.tiebreaker,
+									},
+								]
+							: [],
+					)}
+					saving={tiebreaker.isPending}
+					onSave={(points) => tiebreaker.mutate({ gameId: tbGame.id, points })}
+				/>
+			)}
 			<PublicPicksNote games={games} />
 		</section>
 	);
