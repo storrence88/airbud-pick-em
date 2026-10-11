@@ -13,6 +13,7 @@ import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
 import { Standings } from "#/components/Standings";
+import { WeekWinnerBanner } from "#/components/WeekLeaderboard";
 import {
 	type ConfidenceChange,
 	forfeited,
@@ -92,6 +93,7 @@ function LeaguePage() {
 					)}
 				</div>
 			</div>
+			<WeekWinnerBanner leagueId={leagueId} />
 			<div className="relative mt-6 inline-flex rounded-full border bg-card p-1 text-sm font-semibold">
 				{(["picks", "standings"] as const).map((t) => (
 					<button

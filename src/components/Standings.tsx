@@ -29,6 +29,7 @@ import {
 	standingsQuery,
 } from "#/server/leagues";
 import { Avatar } from "./Avatar";
+import { WeekLeaderboard } from "./WeekLeaderboard";
 
 const BADGE_STYLE: Record<BadgeId, { icon: LucideIcon; className: string }> = {
 	"week-winner": { icon: Crown, className: "text-amber-300" },
@@ -40,6 +41,45 @@ const BADGE_STYLE: Record<BadgeId, { icon: LucideIcon; className: string }> = {
 };
 
 export function Standings({ leagueId }: { leagueId: string }) {
+	const [view, setView] = useState<"season" | "weekly">("season");
+	const { data: week } = useSuspenseQuery(leagueWeekQuery(leagueId));
+	const members = new Map(week.members.map((m) => [m.user_id, m]));
+	return (
+		<section className="mt-6">
+			<div className="mb-4 inline-flex rounded-full border p-0.5 text-xs font-semibold">
+				{(["season", "weekly"] as const).map((v) => (
+					<button
+						key={v}
+						type="button"
+						aria-pressed={view === v}
+						onClick={() => setView(v)}
+						className={cn(
+							"h-7 rounded-full px-3.5 capitalize transition-colors",
+							view === v
+								? "bg-muted text-foreground"
+								: "text-muted-foreground hover:text-foreground",
+						)}
+					>
+						{v}
+					</button>
+				))}
+			</div>
+			{view === "season" ? (
+				<SeasonStandings leagueId={leagueId} />
+			) : (
+				<WeekLeaderboard leagueId={leagueId} />
+			)}
+			{/* Keyed by week so a draft doesn't carry into the next one. */}
+			<TrashTalkBoard
+				key={`${week.trashTalk.season}-${week.trashTalk.week}`}
+				leagueId={leagueId}
+				members={members}
+			/>
+		</section>
+	);
+}
+
+function SeasonStandings({ leagueId }: { leagueId: string }) {
 	const { data: week } = useSuspenseQuery(leagueWeekQuery(leagueId));
 	const { data, isLoading } = useQuery(standingsQuery(leagueId));
 	const { rows, flair, formerRows } = useMemo(() => {
@@ -72,9 +112,9 @@ export function Standings({ leagueId }: { leagueId: string }) {
 		data?.games.reduce((max, g) => Math.max(max, g.week), 0) ?? 0;
 
 	if (isLoading)
-		return <p className="mt-6 text-muted-foreground">Loading standings…</p>;
+		return <p className="text-muted-foreground">Loading standings…</p>;
 	return (
-		<section className="mt-6">
+		<div>
 			{lastWeek === 0 && (
 				<p className="mb-4 text-sm text-muted-foreground">
 					No finished games yet. Standings fill in as games go final.
@@ -135,13 +175,7 @@ export function Standings({ leagueId }: { leagueId: string }) {
 					</ul>
 				</div>
 			)}
-			{/* Keyed by week so a draft doesn't carry into the next one. */}
-			<TrashTalkBoard
-				key={`${week.trashTalk.season}-${week.trashTalk.week}`}
-				leagueId={leagueId}
-				members={members}
-			/>
-		</section>
+		</div>
 	);
 }
 
