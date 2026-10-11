@@ -42,9 +42,13 @@ const BADGE_STYLE: Record<BadgeId, { icon: LucideIcon; className: string }> = {
 export function Standings({ leagueId }: { leagueId: string }) {
 	const { data: week } = useSuspenseQuery(leagueWeekQuery(leagueId));
 	const { data, isLoading } = useQuery(standingsQuery(leagueId));
-	const { rows, flair } = useMemo(() => {
+	const { rows, flair, formerRows } = useMemo(() => {
 		if (!data)
-			return { rows: [], flair: {} as ReturnType<typeof computeFlair> };
+			return {
+				rows: [],
+				flair: {} as ReturnType<typeof computeFlair>,
+				formerRows: [],
+			};
 		const ids = week.members.map((m) => m.user_id);
 		const settings = {
 			mode: week.league.mode,
@@ -53,8 +57,16 @@ export function Standings({ leagueId }: { leagueId: string }) {
 		return {
 			rows: computeStandings(ids, data.picks, data.games, settings),
 			flair: computeFlair(ids, data.picks, data.games, data.weeks, settings),
+			// Removed members keep their points but sit outside the ranking and flair.
+			formerRows: computeStandings(
+				data.formers.map((f) => f.user_id),
+				data.picks,
+				data.games,
+				settings,
+			),
 		};
 	}, [data, week]);
+	const formers = new Map(data?.formers.map((f) => [f.user_id, f]));
 	const members = new Map(week.members.map((m) => [m.user_id, m]));
 	const lastWeek =
 		data?.games.reduce((max, g) => Math.max(max, g.week), 0) ?? 0;
@@ -92,6 +104,37 @@ export function Standings({ leagueId }: { leagueId: string }) {
 					);
 				})}
 			</ol>
+			{formerRows.length > 0 && (
+				<div className="mt-6">
+					<h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+						Former members
+					</h3>
+					<ul className="grid gap-1.5">
+						{formerRows.map((r) => {
+							const f = formers.get(r.userId);
+							if (!f) return null;
+							return (
+								<li
+									key={r.userId}
+									className="flex items-center gap-3 rounded-lg border border-dashed px-3 py-2 text-muted-foreground sm:px-4"
+								>
+									<Avatar
+										profile={f}
+										size={28}
+										className="opacity-60 grayscale"
+									/>
+									<span className="min-w-0 flex-1 truncate">
+										{f.display_name}
+									</span>
+									<span className="font-display text-lg font-bold tabular-nums">
+										{r.total}
+									</span>
+								</li>
+							);
+						})}
+					</ul>
+				</div>
+			)}
 			{/* Keyed by week so a draft doesn't carry into the next one. */}
 			<TrashTalkBoard
 				key={`${week.trashTalk.season}-${week.trashTalk.week}`}
