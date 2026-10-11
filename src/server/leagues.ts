@@ -135,7 +135,7 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 	.inputValidator(
 		z.object({
 			leagueId: z.string().uuid(),
-			week: z.number().int().optional(),
+			week: z.number().int().min(1).max(23).optional(),
 		}),
 	)
 	.handler(async ({ data }) => {
@@ -188,9 +188,13 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 			(locked ?? []).map((r) => [r.id, r.locked_spread as number | null]),
 		);
 
-		// Removed members' kept picks belong to the standings, not this week.
+		// Removed members' kept picks stay out of the pick board but still show
+		// in the week's results, muted like the standings' "Former members".
 		const roster = (members ?? []).map(toMember);
 		const inLeague = new Set(roster.map((m) => m.user_id));
+		const allPicks = (picks ?? []) as PickRow[];
+		const formerPicks = allPicks.filter((p) => !inLeague.has(p.user_id));
+		const formers = await formerProfiles(sb, formerPicks);
 
 		return {
 			userId: user.id,
@@ -200,9 +204,9 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 				lockedSpread: lockedById[g.id] ?? null,
 			})),
 			members: roster,
-			picks: ((picks ?? []) as PickRow[]).filter((p) =>
-				inLeague.has(p.user_id),
-			),
+			picks: allPicks.filter((p) => inLeague.has(p.user_id)),
+			formers,
+			formerPicks,
 			trashTalk: {
 				season,
 				week,
@@ -213,11 +217,13 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 		};
 	});
 
+/** A week of the league. Leave out `week` for the current one; earlier weeks are finished, so they don't poll. */
 export const leagueWeekQuery = (leagueId: string, week?: number) =>
 	queryOptions({
 		queryKey: ["league", leagueId, "week", week ?? "current"],
 		queryFn: () => getLeagueWeek({ data: { leagueId, week } }),
-		refetchInterval: 30_000,
+		refetchInterval: week ? false : 30_000,
+		staleTime: week ? 5 * 60_000 : 0,
 	});
 
 /** Saves a pick and returns its confidence value (assigned by the DB in confidence leagues). */
@@ -421,6 +427,22 @@ export const saveTrashTalk = createServerFn({ method: "POST" })
 		if (error) throw new Error(error.code === "42501" ? locked : error.message);
 	});
 
+/** Profiles of the people behind picks kept from members who left or were removed. */
+async function formerProfiles(
+	sb: ReturnType<typeof getSupabaseServerClient>,
+	picks: PickRow[],
+) {
+	const ids = [...new Set(picks.map((p) => p.user_id))];
+	if (!ids.length) return [];
+	const { data } = await sb
+		.from("profiles")
+		.select(`id, ${PUBLIC_PROFILE_COLUMNS}`)
+		.in("id", ids);
+	return (data ?? []).map(
+		({ id, ...p }) => ({ user_id: id as string, ...p }) as FormerMember,
+	);
+}
+
 const PAGE = 1000;
 
 /** Every revealed pick on finished games this season, for the standings. */
@@ -470,17 +492,9 @@ export const getStandingsData = createServerFn({ method: "GET" })
 			.eq("league_id", data.leagueId);
 		if (rosterError) throw new Error(rosterError.message);
 		const inLeague = new Set((roster ?? []).map((m) => m.user_id as string));
-		const formerIds = [
-			...new Set(picks.map((p) => p.user_id).filter((id) => !inLeague.has(id))),
-		];
-		const { data: formerProfiles } = formerIds.length
-			? await sb
-					.from("profiles")
-					.select(`id, ${PUBLIC_PROFILE_COLUMNS}`)
-					.in("id", formerIds)
-			: { data: [] };
-		const formers = (formerProfiles ?? []).map(
-			({ id, ...p }) => ({ user_id: id as string, ...p }) as FormerMember,
+		const formers = await formerProfiles(
+			sb,
+			picks.filter((p) => !inLeague.has(p.user_id)),
 		);
 		return { games, weeks, picks, formers };
 	});

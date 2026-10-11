@@ -4,8 +4,21 @@ import {
 	useQueryClient,
 	useSuspenseQuery,
 } from "@tanstack/react-query";
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { Check, Copy, Lock, Settings } from "lucide-react";
+import {
+	createFileRoute,
+	Link,
+	redirect,
+	useRouterState,
+} from "@tanstack/react-router";
+import {
+	Check,
+	ChevronDown,
+	ChevronLeft,
+	ChevronRight,
+	Copy,
+	Lock,
+	Settings,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfidenceBoard } from "#/components/ConfidenceBoard";
@@ -15,6 +28,7 @@ import type { EffectKind } from "#/components/PickEffect";
 import { Standings } from "#/components/Standings";
 import { Tiebreaker } from "#/components/Tiebreaker";
 import { WeekWinnerBanner } from "#/components/WeekLeaderboard";
+import { WeekResults } from "#/components/WeekResults";
 import {
 	type ConfidenceChange,
 	forfeited,
@@ -27,6 +41,7 @@ import type { Game } from "#/lib/nfl/types";
 import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 import { tiebreakerGameId } from "#/lib/tiebreaker";
 import { cn } from "#/lib/utils";
+import { weekResults } from "#/lib/week-results";
 import {
 	leagueWeekQuery,
 	type PickRow,
@@ -38,12 +53,33 @@ import {
 import { myProfileQuery } from "#/server/profile";
 
 export const Route = createFileRoute("/league/$leagueId")({
+	// ?week=N browses an earlier week; no week means the current one.
+	validateSearch: (search: Record<string, unknown>): { week?: number } => {
+		const week = Number(search.week);
+		return Number.isInteger(week) && week >= 1 && week <= 23 ? { week } : {};
+	},
 	beforeLoad: ({ context, location }) => {
 		if (!context.user)
 			throw redirect({ to: "/login", search: { next: location.href } });
 	},
-	loader: ({ context, params }) =>
-		context.queryClient.ensureQueryData(leagueWeekQuery(params.leagueId)),
+	loaderDeps: ({ search }) => ({ week: search.week }),
+	loader: async ({ context, params, deps }) => {
+		const current = await context.queryClient.ensureQueryData(
+			leagueWeekQuery(params.leagueId),
+		);
+		if (!deps.week) return;
+		// Only weeks that are over can be browsed; anything later is this week.
+		if (deps.week >= (current.games[0]?.week ?? 0))
+			throw redirect({
+				to: "/league/$leagueId",
+				params,
+				search: {},
+				replace: true,
+			});
+		await context.queryClient.ensureQueryData(
+			leagueWeekQuery(params.leagueId, deps.week),
+		);
+	},
 	component: LeaguePage,
 	errorComponent: ({ error }) => (
 		<main className="mx-auto max-w-3xl px-4 py-16 text-muted-foreground">
@@ -64,6 +100,7 @@ function lineText(g: WeekGame) {
 
 function LeaguePage() {
 	const { leagueId } = Route.useParams();
+	const { week } = Route.useSearch();
 	const [tab, setTab] = useState<"picks" | "standings">("picks");
 	const { data } = useSuspenseQuery(leagueWeekQuery(leagueId));
 	const { league } = data;
@@ -129,7 +166,7 @@ function LeaguePage() {
 					transition={{ duration: 0.15 }}
 				>
 					{tab === "picks" ? (
-						<WeekPicks leagueId={leagueId} />
+						<WeekPicks leagueId={leagueId} week={week} />
 					) : (
 						<Standings leagueId={leagueId} />
 					)}
@@ -168,13 +205,24 @@ function InviteButton({ code }: { code: string }) {
 	);
 }
 
-function WeekPicks({ leagueId }: { leagueId: string }) {
+function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 	const qc = useQueryClient();
-	const query = leagueWeekQuery(leagueId);
+	const query = leagueWeekQuery(leagueId, week);
 	const { data } = useSuspenseQuery(query);
+	const { data: current } = useSuspenseQuery(leagueWeekQuery(leagueId));
 	const { league, userId, members } = data;
 	const games = data.games as WeekGame[];
 	const [error, setError] = useState("");
+	// An earlier week: everything's final, so it's read-only with everyone's picks.
+	const past = week != null;
+	const shown = games[0]?.week ?? week ?? 0;
+	const thisWeek = current.games[0]?.week ?? shown;
+	const loading = useRouterState({ select: (s) => s.isLoading });
+
+	// Stepping back a week is the common move, so have it ready.
+	useEffect(() => {
+		if (shown > 1) qc.prefetchQuery(leagueWeekQuery(leagueId, shown - 1));
+	}, [qc, leagueId, shown]);
 
 	const mine = useMemo(
 		() =>
@@ -314,7 +362,7 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 		(g) => g.state !== "pre" && mine.get(g.id)?.is_lock,
 	);
 
-	const effects = useResultEffects(leagueId, games, mine, league.mode);
+	const effects = useResultEffects(leagueId, games, mine, league.mode, !past);
 
 	// Games that kicked off without a pick: they score 0 and don't count against you.
 	const missed = games.filter((g) => g.state !== "pre" && !mine.has(g.id));
@@ -353,13 +401,13 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 	// Each set of fixes is sent once, so a rejected one isn't retried forever.
 	const settled = useRef("");
 	useEffect(() => {
-		if (!isConfidence || confidence.isPending) return;
+		if (past || !isConfidence || confidence.isPending) return;
 		const changes = settle(ranked, games.length, missed.length);
 		const key = JSON.stringify(changes);
 		if (!changes.length || key === settled.current) return;
 		settled.current = key;
 		confidence.mutate(changes);
-	}, [isConfidence, ranked, games.length, missed.length, confidence]);
+	}, [past, isConfidence, ranked, games.length, missed.length, confidence]);
 
 	const made = games.filter((g) => mine.has(g.id)).length;
 	const pickable = games.length - missed.length;
@@ -374,35 +422,78 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 			el.scrollIntoView({ behavior: "smooth", block: "start" });
 	}
 
+	const myPoints = useMemo(
+		() =>
+			past
+				? weekResults([userId], data.picks, games, {
+						mode: league.mode,
+						pushValue: league.settings.pushValue,
+					})[0].points
+				: 0,
+		[past, userId, data.picks, games, league],
+	);
+
 	return (
-		<section className="mt-6">
-			<div className="flex items-end justify-between">
-				<h2 className="font-display text-2xl font-semibold uppercase">
-					Week {games[0]?.week}
-				</h2>
-				<div className="flex items-baseline gap-2">
-					{missed.length > 0 && (
+		<section
+			className={cn(
+				"mt-6 transition-opacity",
+				loading && "pointer-events-none opacity-60",
+			)}
+		>
+			<div className="flex items-end justify-between gap-3">
+				<WeekSwitcher leagueId={leagueId} shown={shown} thisWeek={thisWeek} />
+				{past ? (
+					<div className="flex items-baseline gap-2">
 						<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-							{missed.length} missed
+							Your week
 						</span>
-					)}
-					<span className="font-display text-2xl font-bold tabular-nums">
-						{made}
-						<span className="text-muted-foreground">/{pickable}</span>
-					</span>
+						<span className="font-display text-2xl font-bold tabular-nums">
+							{myPoints}
+							<span className="text-base text-muted-foreground"> pts</span>
+						</span>
+					</div>
+				) : (
+					<div className="flex items-baseline gap-2">
+						{missed.length > 0 && (
+							<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+								{missed.length} missed
+							</span>
+						)}
+						<span className="font-display text-2xl font-bold tabular-nums">
+							{made}
+							<span className="text-muted-foreground">/{pickable}</span>
+						</span>
+					</div>
+				)}
+			</div>
+			{!past && (
+				<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+					<motion.div
+						className="h-full rounded-full bg-primary"
+						animate={{
+							width: `${pickable ? (made / pickable) * 100 : 0}%`,
+						}}
+						transition={{ type: "spring", stiffness: 120, damping: 20 }}
+					/>
 				</div>
-			</div>
-			<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-				<motion.div
-					className="h-full rounded-full bg-primary"
-					animate={{
-						width: `${pickable ? (made / pickable) * 100 : 0}%`,
-					}}
-					transition={{ type: "spring", stiffness: 120, damping: 20 }}
-				/>
-			</div>
+			)}
 			{error && <p className="mt-3 text-sm text-loss">{error}</p>}
-			{isConfidence && (
+			{past && (
+				<WeekResults
+					key={`results-${shown}`}
+					games={games}
+					members={members}
+					formers={data.formers}
+					picks={data.picks}
+					formerPicks={data.formerPicks}
+					settings={{
+						mode: league.mode,
+						pushValue: league.settings.pushValue,
+					}}
+					userId={userId}
+				/>
+			)}
+			{isConfidence && !past && (
 				<div className="sticky top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-20 mt-6 grid grid-cols-2 rounded-full border bg-card/90 p-1 text-sm font-semibold shadow-lg backdrop-blur-xl lg:hidden">
 					{(
 						[
@@ -435,17 +526,19 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 			)}
 			<div
 				ref={viewsTop}
+				key={`games-${shown}`}
 				className={cn(
 					"scroll-mt-32",
 					isConfidence &&
+						!past &&
 						"lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6",
 				)}
 			>
 				<div
 					className={cn(
 						"mt-6 grid gap-3 sm:gap-4 md:grid-cols-2",
-						isConfidence && "lg:grid-cols-1",
-						isConfidence && view === "rank" && "hidden lg:grid",
+						isConfidence && !past && "lg:grid-cols-1",
+						isConfidence && !past && view === "rank" && "hidden lg:grid",
 					)}
 				>
 					{games.map((g) => {
@@ -503,7 +596,7 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 						);
 					})}
 				</div>
-				{isConfidence && (
+				{isConfidence && !past && (
 					<ConfidenceBoard
 						games={games}
 						picks={mine}
@@ -540,6 +633,81 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 			)}
 			<PublicPicksNote games={games} />
 		</section>
+	);
+}
+
+/** "‹ Week 5 ›" with a menu of every week so far; earlier weeks go in the URL. */
+function WeekSwitcher({
+	leagueId,
+	shown,
+	thisWeek,
+}: {
+	leagueId: string;
+	shown: number;
+	thisWeek: number;
+}) {
+	const navigate = Route.useNavigate();
+	const go = (w: number) =>
+		navigate({
+			search: w >= thisWeek ? {} : { week: w },
+			resetScroll: false,
+		});
+	const weeks = Array.from({ length: thisWeek }, (_, i) => i + 1);
+	const step =
+		"grid size-9 place-items-center rounded-full border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
+	return (
+		<div className="min-w-0">
+			<div className="flex items-center gap-1.5">
+				<button
+					type="button"
+					onClick={() => go(shown - 1)}
+					disabled={shown <= 1}
+					aria-label="Previous week"
+					className={step}
+				>
+					<ChevronLeft className="size-4" aria-hidden />
+				</button>
+				<label className="relative flex items-center gap-1 rounded-md px-1.5 transition-colors focus-within:ring-2 focus-within:ring-ring hover:bg-muted">
+					<h2 className="font-display text-2xl font-semibold uppercase">
+						Week {shown}
+					</h2>
+					<ChevronDown className="size-4 text-muted-foreground" aria-hidden />
+					<select
+						value={shown}
+						onChange={(e) => go(Number(e.target.value))}
+						aria-label="Choose a week"
+						className="absolute inset-0 cursor-pointer appearance-none opacity-0"
+					>
+						{weeks.map((w) => (
+							<option key={w} value={w}>
+								Week {w}
+								{w === thisWeek ? " (this week)" : ""}
+							</option>
+						))}
+					</select>
+				</label>
+				<button
+					type="button"
+					onClick={() => go(shown + 1)}
+					disabled={shown >= thisWeek}
+					aria-label="Next week"
+					className={step}
+				>
+					<ChevronRight className="size-4" aria-hidden />
+				</button>
+			</div>
+			{shown < thisWeek && (
+				<Link
+					to="/league/$leagueId"
+					params={{ leagueId }}
+					search={{}}
+					resetScroll={false}
+					className="mt-1 ml-1 inline-block text-xs font-semibold text-primary hover:underline"
+				>
+					Back to this week
+				</Link>
+			)}
+		</div>
 	);
 }
 
@@ -604,11 +772,13 @@ function useResultEffects(
 	games: WeekGame[],
 	mine: Map<string, PickRow>,
 	mode: ScoringMode,
+	/** Off when browsing an earlier week, so old results don't replay. */
+	enabled: boolean,
 ) {
 	const { data: me } = useQuery(myProfileQuery());
 	const [playing, setPlaying] = useState<Record<string, EffectKind>>({});
 	useEffect(() => {
-		if (!me) return;
+		if (!me || !enabled) return;
 		const key = `pickem:results:${leagueId}`;
 		let seen: string[] | null = null;
 		try {
@@ -653,7 +823,7 @@ function useResultEffects(
 			if (kind !== "none") next[g.id] = kind;
 		}
 		if (Object.keys(next).length) setPlaying((p) => ({ ...p, ...next }));
-	}, [leagueId, games, mine, mode, me]);
+	}, [leagueId, games, mine, mode, me, enabled]);
 	return {
 		playing,
 		done: (gameId: string) => setPlaying(({ [gameId]: _, ...rest }) => rest),
