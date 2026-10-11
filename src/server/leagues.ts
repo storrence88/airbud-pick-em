@@ -360,3 +360,58 @@ export const standingsQuery = (leagueId: string) =>
 		queryKey: ["league", leagueId, "standings"],
 		queryFn: () => getStandingsData({ data: { leagueId } }),
 	});
+
+export const PUSH_VALUES = [0, 0.5, 1] as const;
+
+/** The league plus whether you can change it. Only the commissioner sees the settings form. */
+export const getLeagueSettings = createServerFn({ method: "GET" })
+	.inputValidator(z.object({ leagueId: z.string().uuid() }))
+	.handler(async ({ data }) => {
+		const { sb, user } = await requireUser();
+		const [{ data: league, error }, { data: me }] = await Promise.all([
+			sb.from("leagues").select("*").eq("id", data.leagueId).maybeSingle(),
+			sb
+				.from("league_members")
+				.select("role")
+				.eq("league_id", data.leagueId)
+				.eq("user_id", user.id)
+				.maybeSingle(),
+		]);
+		if (error) throw new Error(error.message);
+		if (!league) throw new Error("League not found, or you are not a member.");
+		return {
+			league: league as League,
+			isCommissioner: me?.role === "commissioner",
+		};
+	});
+
+export const leagueSettingsQuery = (leagueId: string) =>
+	queryOptions({
+		queryKey: ["league", leagueId, "settings"],
+		queryFn: () => getLeagueSettings({ data: { leagueId } }),
+	});
+
+/** Renames the league and sets the push value. The DB checks you're the commissioner. */
+export const updateLeagueSettings = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			name: z.string().trim().min(1).max(60),
+			pushValue: z.literal(PUSH_VALUES),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { data: league, error } = await sb.rpc("update_league_settings", {
+			p_league: data.leagueId,
+			p_name: data.name,
+			p_push_value: data.pushValue,
+		});
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Only the league commissioner can change settings."
+					: error.message,
+			);
+		return league as League;
+	});
