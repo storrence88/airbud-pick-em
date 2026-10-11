@@ -180,12 +180,19 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 		const failed = membersError ?? picksError;
 		if (failed) throw new Error(failed.message);
 		// Locked spreads come from our DB so ATS uses the frozen line, not the live one.
+		// "*" so the saved crowd split (migration 0018) is read when it exists.
 		const { data: locked } = await sb
 			.from("games")
-			.select("id, locked_spread")
+			.select("*")
 			.in("id", gameIds);
-		const lockedById = Object.fromEntries(
-			(locked ?? []).map((r) => [r.id, r.locked_spread as number | null]),
+		const lockedById = new Map(
+			(locked ?? []).map((r) => [
+				r.id as string,
+				{
+					spread: r.locked_spread as number | null,
+					crowd: (r.crowd_home_pct ?? null) as number | null,
+				},
+			]),
 		);
 
 		// Removed members' kept picks stay out of the pick board but still show
@@ -201,7 +208,9 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 			league: league as League,
 			games: games.map((g) => ({
 				...g,
-				lockedSpread: lockedById[g.id] ?? null,
+				lockedSpread: lockedById.get(g.id)?.spread ?? null,
+				/** ESPN's home share saved at lock; null until it's stored. */
+				crowdHomePct: lockedById.get(g.id)?.crowd ?? null,
 			})),
 			members: roster,
 			picks: allPicks.filter((p) => inLeague.has(p.user_id)),

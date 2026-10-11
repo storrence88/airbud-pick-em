@@ -37,6 +37,7 @@ import {
 	settle,
 } from "#/lib/confidence";
 import { enteredNote } from "#/lib/entered";
+import { fadedThePublic } from "#/lib/faded";
 import type { Game } from "#/lib/nfl/types";
 import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 import { tiebreakerGameId } from "#/lib/tiebreaker";
@@ -88,7 +89,10 @@ export const Route = createFileRoute("/league/$leagueId")({
 	),
 });
 
-type WeekGame = Game & { lockedSpread: number | null };
+type WeekGame = Game & {
+	lockedSpread: number | null;
+	crowdHomePct: number | null;
+};
 
 /** "KC -3.5" style text from the home team's line. */
 function lineText(g: WeekGame) {
@@ -555,10 +559,32 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 								];
 							}
 						}
+						const fade = fadedThePublic(
+							g,
+							// Prefer the split saved at lock; fall back to the live feed.
+							g.crowdHomePct != null
+								? { home: g.crowdHomePct, away: 100 - g.crowdHomePct }
+								: g.publicPicks,
+							data.picks,
+							league.mode,
+						);
 						return (
 							<GameCard
 								key={g.id}
 								game={g}
+								faded={
+									fade && {
+										crowd: fade.crowd,
+										// You first, then everyone else by name.
+										names: [...fade.userIds]
+											.sort(
+												(a, b) => Number(b === userId) - Number(a === userId),
+											)
+											.map((id) =>
+												id === userId ? "You" : (names.get(id) ?? "Player"),
+											),
+									}
+								}
 								picked={myPick?.team}
 								onPick={(team) => choose(g, team)}
 								lineText={league.mode === "spread" ? lineText(g) : g.spreadText}
