@@ -22,6 +22,7 @@ import { Route as LeaguesIndexRouteImport } from './routes/leagues/index'
 import { Route as ApiBotStandingsRouteImport } from './routes/api/bot/standings'
 import { Route as ApiBotWeekRouteImport } from './routes/api/bot/week'
 import { Route as LeagueLeagueIdSettingsRouteImport } from './routes/league/$leagueId_.settings'
+import { Route as LeagueLeagueIdSurvivorRouteImport } from './routes/league/$leagueId_.survivor'
 import { Route as ApiBotGamesGameIdRouteImport } from './routes/api/bot/games/$gameId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -89,6 +90,11 @@ const LeagueLeagueIdSettingsRoute = LeagueLeagueIdSettingsRouteImport.update({
   path: '/league/$leagueId/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LeagueLeagueIdSurvivorRoute = LeagueLeagueIdSurvivorRouteImport.update({
+  id: '/league/$leagueId_/survivor',
+  path: '/league/$leagueId/survivor',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBotGamesGameIdRoute = ApiBotGamesGameIdRouteImport.update({
   id: '/api/bot/games/$gameId',
   path: '/api/bot/games/$gameId',
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/api/bot/standings': typeof ApiBotStandingsRoute
   '/api/bot/week': typeof ApiBotWeekRoute
   '/league/$leagueId/settings': typeof LeagueLeagueIdSettingsRoute
+  '/league/$leagueId/survivor': typeof LeagueLeagueIdSurvivorRoute
   '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
 }
 export interface FileRoutesByTo {
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/api/bot/standings': typeof ApiBotStandingsRoute
   '/api/bot/week': typeof ApiBotWeekRoute
   '/league/$leagueId/settings': typeof LeagueLeagueIdSettingsRoute
+  '/league/$leagueId/survivor': typeof LeagueLeagueIdSurvivorRoute
   '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
 }
 export interface FileRoutesById {
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/api/bot/standings': typeof ApiBotStandingsRoute
   '/api/bot/week': typeof ApiBotWeekRoute
   '/league/$leagueId_/settings': typeof LeagueLeagueIdSettingsRoute
+  '/league/$leagueId_/survivor': typeof LeagueLeagueIdSurvivorRoute
   '/api/bot/games/$gameId': typeof ApiBotGamesGameIdRoute
 }
 export interface FileRouteTypes {
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
     | '/api/bot/standings'
     | '/api/bot/week'
     | '/league/$leagueId/settings'
+    | '/league/$leagueId/survivor'
     | '/api/bot/games/$gameId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/api/bot/standings'
     | '/api/bot/week'
     | '/league/$leagueId/settings'
+    | '/league/$leagueId/survivor'
     | '/api/bot/games/$gameId'
   id:
     | '__root__'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '/api/bot/standings'
     | '/api/bot/week'
     | '/league/$leagueId_/settings'
+    | '/league/$leagueId_/survivor'
     | '/api/bot/games/$gameId'
   fileRoutesById: FileRoutesById
 }
@@ -209,6 +221,7 @@ export interface RootRouteChildren {
   ApiBotStandingsRoute: typeof ApiBotStandingsRoute
   ApiBotWeekRoute: typeof ApiBotWeekRoute
   LeagueLeagueIdSettingsRoute: typeof LeagueLeagueIdSettingsRoute
+  LeagueLeagueIdSurvivorRoute: typeof LeagueLeagueIdSurvivorRoute
   ApiBotGamesGameIdRoute: typeof ApiBotGamesGameIdRoute
 }
 
@@ -305,6 +318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeagueLeagueIdSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/league/$leagueId_/survivor': {
+      id: '/league/$leagueId_/survivor'
+      path: '/league/$leagueId/survivor'
+      fullPath: '/league/$leagueId/survivor'
+      preLoaderRoute: typeof LeagueLeagueIdSurvivorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/bot/games/$gameId': {
       id: '/api/bot/games/$gameId'
       path: '/api/bot/games/$gameId'
@@ -329,6 +349,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBotStandingsRoute: ApiBotStandingsRoute,
   ApiBotWeekRoute: ApiBotWeekRoute,
   LeagueLeagueIdSettingsRoute: LeagueLeagueIdSettingsRoute,
+  LeagueLeagueIdSurvivorRoute: LeagueLeagueIdSurvivorRoute,
   ApiBotGamesGameIdRoute: ApiBotGamesGameIdRoute,
 }
 export const routeTree = rootRouteImport

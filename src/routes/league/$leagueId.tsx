@@ -13,6 +13,7 @@ import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
 import { Standings } from "#/components/Standings";
+import { SurvivorLink } from "#/components/SurvivorLink";
 import {
 	type ConfidenceChange,
 	forfeited,
@@ -78,6 +79,7 @@ function LeaguePage() {
 					</h1>
 				</div>
 				<div className="flex items-center gap-2">
+					<SurvivorLink leagueId={leagueId} />
 					<InviteButton code={league.invite_code} />
 					{isCommissioner && (
 						<Link
