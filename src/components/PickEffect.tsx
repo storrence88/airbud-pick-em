@@ -83,7 +83,12 @@ export function PickEffect({
 	return null;
 }
 
-const palette = (colors: string[]) => [...colors, "#ffffff", "var(--primary)"];
+/** Team colors plus the page foreground (white on dark, ink on light) and the accent. */
+const palette = (colors: string[]) => [
+	...colors,
+	"var(--foreground)",
+	"var(--primary)",
+];
 
 function useParticles<T>(count: number, make: (i: number) => T) {
 	// Random once per effect so re-renders don't reshuffle the burst.
@@ -213,7 +218,7 @@ function Rain() {
 				<motion.span
 					// biome-ignore lint/suspicious/noArrayIndexKey: fixed list
 					key={i}
-					className="absolute top-10 w-px rounded-full bg-sky-300/70"
+					className="absolute top-10 w-px rounded-full bg-sky-500/70 dark:bg-sky-300/70"
 					style={{ left: `${d.left}%`, height: d.len }}
 					initial={{ y: 0, opacity: 0 }}
 					animate={{ y: 140, opacity: [0, 1, 0] }}

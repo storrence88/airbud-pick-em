@@ -19,6 +19,7 @@
   --win: oklch(0.62 0.18 150);
   --loss: oklch(0.6 0.2 25);
   --radius: 1rem;
+  color-scheme: light;
 }
 
 .dark {
@@ -33,6 +34,28 @@
   --accent: oklch(0.3 0.05 145);
   --border: oklch(0.3 0.018 260);
   --ring: oklch(0.75 0.2 145);
+  color-scheme: dark;
+}
+
+/*
+ * Team colors set from data come in both themes as --tc-light / --tc-dark
+ * (see accentVars); .team-accent picks the one for the theme showing.
+ */
+.team-accent,
+[data-team-theme] {
+  --tc: var(--tc-light);
+  --tc-fg: var(--tc-fg-light);
+}
+.dark .team-accent,
+.dark[data-team-theme] {
+  --tc: var(--tc-dark);
+  --tc-fg: var(--tc-fg-dark);
+}
+/* Your favorite team as the app accent, when you've opted in. */
+html[data-team-theme] {
+  --primary: var(--tc);
+  --ring: var(--tc);
+  --primary-foreground: var(--tc-fg);
 }
 
 @theme inline {
