@@ -329,9 +329,7 @@ function LineRow({
 			<span className="flex items-center gap-2 tabular-nums">
 				{moved ? (
 					<>
-						<span className="text-muted-foreground">
-							{open}
-						</span>
+						<span className="text-muted-foreground">{open}</span>
 						<ArrowRight
 							className="size-3.5 text-muted-foreground"
 							aria-label="moved to"
