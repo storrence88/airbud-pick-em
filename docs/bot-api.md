@@ -102,7 +102,7 @@ gets an email from the app instead, so the bot never needs to email anyone.
       "openGames": [
         { "id": "401772938", "kickoff": "2026-10-11T17:00:00Z", "away": "BUF", "home": "KC" }
       ],
-      "message": "Nate, kickoff is <t:1791738000:R> and you've left 1 pick blank. Bold strategy.\nBUF @ KC\nMake your picks: https://<app>/picks"
+      "message": "Nate, kickoff is <t:1791738000:R> and you've left 1 pick blank. Bold strategy.\nBUF @ KC\nMake your picks: https://<app>/league/<leagueId>"
     }
   ]
 }

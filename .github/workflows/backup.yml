@@ -1,0 +1,50 @@
+# Weekly database backup. Supabase's free plan keeps no backups you can
+# restore, so this saves the app's tables (leagues, picks, profiles, survivor,
+# reminders) as a compressed SQL file you can download from the run's
+# Artifacts. Each one is kept for 90 days.
+#
+# Setup (repo Settings > Secrets and variables > Actions):
+#   secret  SUPABASE_DB_URL  Supabase > Connect > Session pooler connection
+#                            string, with your database password filled in.
+#                            (The direct connection is IPv6 only, which
+#                            GitHub's runners can't reach.)
+#
+# Restore: gunzip the file and run it in the Supabase SQL editor or with psql.
+# It covers the public schema only; sign-in accounts stay in Supabase Auth.
+name: Database backup
+
+on:
+  schedule:
+    - cron: "0 10 * * 2" # Tuesdays, after Monday night's game is final
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Add the SUPABASE_DB_URL repo secret first (see the comment at the top of this workflow)."
+            exit 1
+          fi
+      - name: Dump the public schema
+        shell: bash # fail the step if pg_dump fails mid-pipe
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          file="pickem-$(date -u +%Y-%m-%d).sql.gz"
+          docker run --rm -e SUPABASE_DB_URL postgres:17 \
+            sh -c 'pg_dump "$SUPABASE_DB_URL" --schema=public --no-owner --no-privileges' \
+            | gzip > "$file"
+          # A failed dump still leaves a tiny gzip; refuse to keep it.
+          test "$(gunzip -c "$file" | wc -c)" -gt 10000
+          echo "FILE=$file" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}
+          retention-days: 90

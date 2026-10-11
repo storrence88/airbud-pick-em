@@ -21,8 +21,16 @@ function Login() {
 	);
 	const [error, setError] = useState(search.error ?? "");
 	const [discordPending, setDiscordPending] = useState(false);
+	const [code, setCode] = useState("");
+	const [verifying, setVerifying] = useState(false);
+	const [codeError, setCodeError] = useState("");
+	// Only same-site relative redirects, as in /auth/callback.
+	const next =
+		search.next?.startsWith("/") && !search.next.startsWith("//")
+			? search.next
+			: "/leagues";
 	const callbackUrl = () =>
-		`${window.location.origin}/auth/callback?next=${encodeURIComponent(search.next ?? "/leagues")}`;
+		`${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
 	async function signInWithDiscord() {
 		if (!supabase) {
@@ -63,6 +71,32 @@ function Login() {
 		} else setStatus("sent");
 	}
 
+	// The emailed code signs in right here, so it works when the link would
+	// open somewhere else: the Gmail app's browser, or Safari instead of the
+	// home-screen app.
+	async function verify(e: React.FormEvent) {
+		e.preventDefault();
+		if (!supabase) return;
+		setVerifying(true);
+		setCodeError("");
+		const { error } = await supabase.auth.verifyOtp({
+			email,
+			token: code,
+			type: "email",
+		});
+		if (error) {
+			setVerifying(false);
+			setCodeError(
+				/expired|invalid/i.test(error.message)
+					? "That code didn't work. Check it, or send a new one."
+					: error.message,
+			);
+			return;
+		}
+		// A full load so the server picks up the new session.
+		window.location.assign(next);
+	}
+
 	return (
 		<main className="mx-auto max-w-sm px-4 py-12 sm:py-20">
 			<h1 className="font-display text-4xl font-bold uppercase">Sign in</h1>
@@ -85,14 +119,56 @@ function Login() {
 			</div>
 			<AnimatePresence mode="wait">
 				{status === "sent" ? (
-					<motion.p
+					<motion.div
 						key="sent"
 						initial={{ opacity: 0, y: 8 }}
 						animate={{ opacity: 1, y: 0 }}
 						className="mt-6 rounded-lg border bg-card p-4"
 					>
-						Check <strong>{email}</strong> for your sign-in link.
-					</motion.p>
+						<p>
+							Check <strong>{email}</strong> for your sign-in link.
+						</p>
+						<form onSubmit={verify} className="mt-4 space-y-3">
+							<label
+								htmlFor="code"
+								className="block text-sm text-muted-foreground"
+							>
+								Link opening in the wrong app? Type the code from the email
+								instead.
+							</label>
+							<input
+								id="code"
+								inputMode="numeric"
+								autoComplete="one-time-code"
+								pattern="[0-9]{6,8}"
+								maxLength={8}
+								required
+								value={code}
+								onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+								placeholder="123456"
+								className="w-full rounded-md border bg-background px-4 py-3 text-center font-mono text-xl tracking-[0.4em] outline-none ring-ring/40 focus:ring-4"
+							/>
+							<button
+								type="submit"
+								disabled={verifying || code.length < 6}
+								className="w-full rounded-full bg-primary py-3 font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-60"
+							>
+								{verifying ? "Signing in…" : "Sign in with code"}
+							</button>
+							{codeError && <p className="text-sm text-loss">{codeError}</p>}
+						</form>
+						<button
+							type="button"
+							onClick={() => {
+								setStatus("idle");
+								setCode("");
+								setCodeError("");
+							}}
+							className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:underline"
+						>
+							Use a different email or send a new one
+						</button>
+					</motion.div>
 				) : (
 					<motion.form
 						key="form"

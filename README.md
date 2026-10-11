@@ -26,6 +26,8 @@ Other scripts: `npm test` (Vitest), `npm run check` (Biome), `npm run build`.
 2. **Auth redirect:** in Supabase > Authentication > URL Configuration, set the Site URL to your Vercel URL and add `http://localhost:3000/**` and `https://<your-app>.vercel.app/**` as redirect URLs.
 3. **Vercel:** import the repo and set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `CRON_SECRET` (any random string).
 4. **Pick reminder emails (optional):** they're sent from a Gmail account. Turn on 2-Step Verification for it, create an [app password](https://myaccount.google.com/apppasswords), and set `GMAIL_USER` (the address) and `GMAIL_APP_PASSWORD` in Vercel. In GitHub, add the repo secret `CRON_SECRET` (same value as Vercel) and the repo variable `APP_URL` (your Vercel URL); the `Pick reminders` workflow then runs hourly.
+5. **Sign-in emails:** Supabase's built-in email sender only delivers to your own Supabase team's addresses (and a couple an hour), so friends' sign-in emails won't arrive without your own SMTP. In Supabase > Authentication > Emails > SMTP Settings, turn on custom SMTP with host `smtp.gmail.com`, port `465`, your Gmail address as username and sender, and the same app password. Then edit the **Magic Link** email template so it also shows the code: add `<p>Or type this code: <strong>{{ .Token }}</strong></p>`. The sign-in page takes that code for when the link opens in the wrong app.
+6. **Backups (recommended):** add the repo secret `SUPABASE_DB_URL` (Supabase > Connect > Session pooler string, with your database password). The `Database backup` workflow then saves the app's tables every Tuesday as a downloadable artifact.
 
 ## How data flows
 

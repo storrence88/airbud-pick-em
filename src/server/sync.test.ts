@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Game } from "#/lib/nfl/types";
-import { type GameRow, lockSpread, toRow } from "./sync";
+import { fromRow, type GameRow, lockSpread, toRow } from "./sync";
 
 const team = (abbr: string) => ({
 	id: abbr,
@@ -55,5 +55,21 @@ describe("toRow", () => {
 		const live = toRow(game({ state: "in", spread: null }), existing);
 		expect(live.current_spread).toBe(-3);
 		expect(live.locked_spread).toBe(-3);
+	});
+});
+
+describe("fromRow", () => {
+	const row = (over: Partial<GameRow> = {}): GameRow => ({
+		...(toRow(game()) as GameRow),
+		...over,
+	});
+	it("rebuilds a saved game with team names and the line", () => {
+		const g = fromRow(row());
+		expect(g.home).toMatchObject({ abbr: "KC", name: "Kansas City Chiefs" });
+		expect(g.spreadText).toBe("KC -3");
+		expect(fromRow(row({ current_spread: 2.5 })).spreadText).toBe("BUF -2.5");
+	});
+	it("labels finished games", () => {
+		expect(fromRow(row({ state: "post" })).statusText).toBe("Final");
 	});
 });

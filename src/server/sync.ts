@@ -1,5 +1,6 @@
 import { espnProvider } from "#/lib/nfl/espn";
-import type { Game } from "#/lib/nfl/types";
+import { teamByAbbr, teamLogo } from "#/lib/nfl/teams";
+import type { Game, Team } from "#/lib/nfl/types";
 import { getSupabaseAdminClient } from "#/lib/supabase.server";
 
 export interface GameRow {
@@ -49,18 +50,111 @@ export function toRow(game: Game, existing?: GameRow): GameRow {
 	};
 }
 
+function savedTeam(abbr: string): Team {
+	const team = teamByAbbr(abbr);
+	const name = team?.name ?? abbr;
+	return {
+		id: abbr,
+		abbr,
+		name,
+		shortName: name.split(" ").at(-1) ?? abbr,
+		color: team?.color ?? "#333333",
+		altColor: team?.altColor ?? "#cccccc",
+		logo: teamLogo(abbr),
+	};
+}
+
+function spreadText(row: GameRow): string | null {
+	const line = row.locked_spread ?? row.current_spread;
+	if (line == null) return null;
+	if (line === 0) return "EVEN";
+	return line < 0 ? `${row.home_team} ${line}` : `${row.away_team} -${line}`;
+}
+
+/** A saved game as the app's Game, for when ESPN can't be reached. */
+export function fromRow(row: GameRow): Game {
+	return {
+		id: row.id,
+		season: row.season,
+		week: row.week,
+		kickoff: row.kickoff,
+		state: row.state,
+		statusText:
+			row.state === "post" ? "Final" : row.state === "in" ? "Live" : "",
+		home: savedTeam(row.home_team),
+		away: savedTeam(row.away_team),
+		homeScore: row.home_score,
+		awayScore: row.away_score,
+		spread: row.current_spread,
+		spreadText: spreadText(row),
+	};
+}
+
+/**
+ * The week as last saved: that week of the newest season, or for the current
+ * week the first one with a game not yet final (else the latest week).
+ */
+async function savedWeek(week?: number): Promise<Game[]> {
+	const admin = getSupabaseAdminClient();
+	if (!admin) return [];
+	const { data: latest } = await admin
+		.from("games")
+		.select("season, week, state")
+		.order("season", { ascending: false })
+		.order("week", { ascending: true })
+		.limit(400);
+	const rows = (latest ?? []) as Pick<GameRow, "season" | "week" | "state">[];
+	const season = rows[0]?.season;
+	if (season == null) return [];
+	const inSeason = rows.filter((r) => r.season === season);
+	const target =
+		week ??
+		inSeason.find((r) => r.state !== "post")?.week ??
+		inSeason.at(-1)?.week;
+	const { data } = await admin
+		.from("games")
+		.select("*")
+		.eq("season", season)
+		.eq("week", target)
+		.order("kickoff");
+	return ((data ?? []) as GameRow[]).map(fromRow);
+}
+
 const lastSync = new Map<string, number>();
+const lastGood = new Map<string, Game[]>();
 const SYNC_TTL_MS = 60_000;
+
+/**
+ * ESPN's week, or if ESPN is down, the last copy this instance saw, then the
+ * copy saved in the database, so a feed hiccup never takes the app down.
+ */
+async function fetchWeek(
+	week?: number,
+): Promise<{ games: Game[]; live: boolean }> {
+	const key = String(week ?? "current");
+	try {
+		const games = await espnProvider.getWeek({ week });
+		if (games.length > 0) lastGood.set(key, games);
+		return { games, live: true };
+	} catch (err) {
+		console.error("ESPN unavailable, using saved games", err);
+		const cached = lastGood.get(key);
+		if (cached) return { games: cached, live: false };
+		const saved = await savedWeek(week);
+		if (saved.length === 0) throw err;
+		return { games: saved, live: false };
+	}
+}
 
 /**
  * Fetches a week from ESPN and saves it. Called lazily when someone opens a
  * week (at most once a minute per instance) and by the /api/sync cron.
  */
 export async function syncWeek(week?: number, force = false): Promise<Game[]> {
-	const games = await espnProvider.getWeek({ week });
+	const { games, live } = await fetchWeek(week);
 	const admin = getSupabaseAdminClient();
 	const key = String(week ?? "current");
-	if (!admin || games.length === 0) return games;
+	if (!live || !admin || games.length === 0) return games;
 	if (!force && Date.now() - (lastSync.get(key) ?? 0) < SYNC_TTL_MS)
 		return games;
 	lastSync.set(key, Date.now());

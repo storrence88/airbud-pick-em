@@ -99,17 +99,6 @@ export function LeaguePageSkeleton() {
 	);
 }
 
-/** The public picks page: header, progress bar and game cards. */
-export function PicksPageSkeleton() {
-	return (
-		<main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
-			<HeaderSkeleton />
-			<Skeleton className="mt-3 h-1.5 w-full rounded-full" />
-			<GameGridSkeleton />
-		</main>
-	);
-}
-
 /** The leagues list, and a sensible fallback for any other page. */
 export function ListPageSkeleton() {
 	return (

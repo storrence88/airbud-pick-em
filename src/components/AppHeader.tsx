@@ -19,15 +19,17 @@ export function AppHeader() {
 				>
 					PICK<span className="text-primary">'EM</span>
 				</Link>
-				<div className="flex gap-1 text-sm font-medium">
-					<Link
-						to={user ? "/leagues" : "/picks"}
-						className="flex h-10 items-center rounded-full px-3 text-muted-foreground transition-colors hover:text-foreground"
-						activeProps={{ className: "bg-muted !text-foreground" }}
-					>
-						{user ? "My leagues" : "This week"}
-					</Link>
-				</div>
+				{user && (
+					<div className="flex gap-1 text-sm font-medium">
+						<Link
+							to="/leagues"
+							className="flex h-10 items-center rounded-full px-3 text-muted-foreground transition-colors hover:text-foreground"
+							activeProps={{ className: "bg-muted !text-foreground" }}
+						>
+							My leagues
+						</Link>
+					</div>
+				)}
 				{user ? (
 					<div className="ml-auto flex items-center gap-1 text-sm sm:gap-2">
 						{/* Phones are short on room here; the profile page has the setting too. */}
