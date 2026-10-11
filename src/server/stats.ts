@@ -20,7 +20,7 @@ type GameRow = StatsGame & { season: number; state: string };
  * backfill the first time anyone opens stats. Best effort: on any failure the
  * games just don't count toward the crowd comparison.
  */
-async function backfillCrowd(games: GameRow[]) {
+export async function backfillCrowd(games: GameRow[]) {
 	const admin = getSupabaseAdminClient();
 	// Before migration 0018 the column doesn't exist, so there's nothing to fill.
 	if (!admin || !games.length || !("crowd_home_pct" in games[0])) return;
