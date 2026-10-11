@@ -26,6 +26,7 @@ import { useOnline } from "#/components/ConnectionBanner";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
+import { ShareWeek } from "#/components/ShareWeek";
 import { LeaguePageSkeleton } from "#/components/Skeleton";
 import { Standings } from "#/components/Standings";
 import { SurvivorLink } from "#/components/SurvivorLink";
@@ -43,6 +44,7 @@ import { enteredNote } from "#/lib/entered";
 import { fadedThePublic } from "#/lib/faded";
 import type { Game } from "#/lib/nfl/types";
 import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
+import { shareCard } from "#/lib/share-card";
 import { tiebreakerGameId } from "#/lib/tiebreaker";
 import { cn } from "#/lib/utils";
 import { weekResults } from "#/lib/week-results";
@@ -443,6 +445,25 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 				: 0,
 		[past, userId, data.picks, games, league],
 	);
+	// Your week as a shareable card, once every game is final.
+	const card = useMemo(
+		() =>
+			shareCard({
+				userId,
+				rows: weekResults(
+					members.map((m) => m.user_id),
+					data.picks,
+					games,
+					{ mode: league.mode, pushValue: league.settings.pushValue },
+				),
+				games,
+				week: shown,
+				league: league.name,
+				mode: league.mode,
+			}),
+		[userId, members, data.picks, games, shown, league],
+	);
+	const me = members.find((m) => m.user_id === userId);
 
 	return (
 		<section
@@ -454,29 +475,38 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 		>
 			<div className="flex items-end justify-between gap-3">
 				<WeekSwitcher leagueId={leagueId} shown={shown} thisWeek={thisWeek} />
-				{past ? (
-					<div className="flex items-baseline gap-2">
-						<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-							Your week
-						</span>
-						<span className="font-display text-2xl font-bold tabular-nums">
-							{myPoints}
-							<span className="text-base text-muted-foreground"> pts</span>
-						</span>
-					</div>
-				) : (
-					<div className="flex items-baseline gap-2">
-						{missed.length > 0 && (
-							<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-								{missed.length} missed
+				<div className="flex items-center gap-3">
+					{card && me && <ShareWeek card={card} player={me} />}
+					{past ? (
+						<div className="flex items-baseline gap-2">
+							{/* Phones drop the label to leave room for the Share button. */}
+							<span
+								className={cn(
+									"text-xs font-semibold uppercase tracking-wider text-muted-foreground",
+									card && "hidden sm:inline",
+								)}
+							>
+								Your week
 							</span>
-						)}
-						<span className="font-display text-2xl font-bold tabular-nums">
-							{made}
-							<span className="text-muted-foreground">/{pickable}</span>
-						</span>
-					</div>
-				)}
+							<span className="font-display text-2xl font-bold tabular-nums">
+								{myPoints}
+								<span className="text-base text-muted-foreground"> pts</span>
+							</span>
+						</div>
+					) : (
+						<div className="flex items-baseline gap-2">
+							{missed.length > 0 && (
+								<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+									{missed.length} missed
+								</span>
+							)}
+							<span className="font-display text-2xl font-bold tabular-nums">
+								{made}
+								<span className="text-muted-foreground">/{pickable}</span>
+							</span>
+						</div>
+					)}
+				</div>
 			</div>
 			{!past && (
 				<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
