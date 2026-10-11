@@ -7,7 +7,7 @@ const SCOREBOARD =
 interface EspnCompetitor {
 	homeAway: "home" | "away";
 	score?: string;
-	records?: { summary?: string }[];
+	records?: { type?: string; summary?: string }[];
 	team: {
 		id: string;
 		abbreviation: string;
@@ -47,6 +47,8 @@ function toTeam(c: EspnCompetitor): Team {
 		altColor: `#${c.team.alternateColor ?? "cccccc"}`,
 		logo: c.team.logo ?? "",
 		record: c.records?.[0]?.summary,
+		homeRecord: c.records?.find((r) => r.type === "home")?.summary,
+		roadRecord: c.records?.find((r) => r.type === "road")?.summary,
 	};
 }
 
