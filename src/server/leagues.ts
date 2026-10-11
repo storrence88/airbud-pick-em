@@ -27,6 +27,11 @@ export interface Member extends PublicProfile {
 	role: "commissioner" | "member";
 }
 
+/** Someone removed from the league whose picks were kept. */
+export interface FormerMember extends PublicProfile {
+	user_id: string;
+}
+
 export interface PickRow {
 	user_id: string;
 	game_id: string;
@@ -177,6 +182,10 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 			(locked ?? []).map((r) => [r.id, r.locked_spread as number | null]),
 		);
 
+		// Removed members' kept picks belong to the standings, not this week.
+		const roster = (members ?? []).map(toMember);
+		const inLeague = new Set(roster.map((m) => m.user_id));
+
 		return {
 			userId: user.id,
 			league: league as League,
@@ -184,8 +193,10 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 				...g,
 				lockedSpread: lockedById[g.id] ?? null,
 			})),
-			members: (members ?? []).map(toMember),
-			picks: (picks ?? []) as PickRow[],
+			members: roster,
+			picks: ((picks ?? []) as PickRow[]).filter((p) =>
+				inLeague.has(p.user_id),
+			),
 			trashTalk: {
 				season,
 				week,
@@ -357,7 +368,26 @@ export const getStandingsData = createServerFn({ method: "GET" })
 			picks.push(...((page ?? []) as PickRow[]));
 			if (!page || page.length < PAGE) break;
 		}
-		return { games, weeks, picks };
+		// Picks kept from removed members still count, under "Former members".
+		const { data: roster, error: rosterError } = await sb
+			.from("league_members")
+			.select("user_id")
+			.eq("league_id", data.leagueId);
+		if (rosterError) throw new Error(rosterError.message);
+		const inLeague = new Set((roster ?? []).map((m) => m.user_id as string));
+		const formerIds = [
+			...new Set(picks.map((p) => p.user_id).filter((id) => !inLeague.has(id))),
+		];
+		const { data: formerProfiles } = formerIds.length
+			? await sb
+					.from("profiles")
+					.select(`id, ${PUBLIC_PROFILE_COLUMNS}`)
+					.in("id", formerIds)
+			: { data: [] };
+		const formers = (formerProfiles ?? []).map(
+			({ id, ...p }) => ({ user_id: id as string, ...p }) as FormerMember,
+		);
+		return { games, weeks, picks, formers };
 	});
 
 export const standingsQuery = (leagueId: string) =>
@@ -465,6 +495,30 @@ export const deleteLeague = createServerFn({ method: "POST" })
 			throw new Error(
 				error.code === "42501"
 					? "Only the league commissioner can delete the league."
+					: error.message,
+			);
+	});
+
+/** Kicks a member out. Keeping picks leaves their finished games in the standings. */
+export const removeMember = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			userId: z.string().uuid(),
+			keepPicks: z.boolean(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { error } = await sb.rpc("remove_member", {
+			p_league: data.leagueId,
+			p_user: data.userId,
+			p_keep_picks: data.keepPicks,
+		});
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Only the league commissioner can remove members."
 					: error.message,
 			);
 	});

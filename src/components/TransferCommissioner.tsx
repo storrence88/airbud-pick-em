@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, ChevronDown, Crown } from "lucide-react";
+import { ChevronDown, Crown } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { cn } from "#/lib/utils";
 import { type Member, transferCommissioner } from "#/server/leagues";
-import { Avatar } from "./Avatar";
+import { MemberChoice } from "./MemberChoice";
 
 /** Commissioner-only panel for handing the role to another member. */
 export function TransferCommissioner({
@@ -92,55 +92,17 @@ function Picker({ leagueId, others }: { leagueId: string; others: Member[] }) {
 				They get these settings and the bot keys. You stay in the league as a
 				regular member.
 			</p>
-			<fieldset className="mt-4 grid gap-2">
-				<legend className="sr-only">New commissioner</legend>
-				{others.map((m) => {
-					const selected = m.user_id === picked;
-					return (
-						<label
-							key={m.user_id}
-							className={cn(
-								"flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 transition-colors has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-ring/40",
-								selected ? "border-primary bg-primary/5" : "hover:bg-muted",
-							)}
-						>
-							<input
-								type="radio"
-								name="new-commissioner"
-								value={m.user_id}
-								checked={selected}
-								onChange={() => {
-									setPicked(m.user_id);
-									setConfirming(false);
-									transfer.reset();
-								}}
-								className="sr-only"
-							/>
-							<Avatar profile={m} size={32} />
-							<span className="min-w-0 flex-1">
-								<span className="block truncate font-medium">
-									{m.display_name}
-								</span>
-								{m.title && (
-									<span className="block truncate text-xs text-muted-foreground">
-										{m.title}
-									</span>
-								)}
-							</span>
-							<span
-								className={cn(
-									"grid size-5 shrink-0 place-items-center rounded-full border transition-colors",
-									selected &&
-										"border-primary bg-primary text-primary-foreground",
-								)}
-								aria-hidden
-							>
-								{selected && <Check className="size-3.5" />}
-							</span>
-						</label>
-					);
-				})}
-			</fieldset>
+			<MemberChoice
+				name="new-commissioner"
+				legend="New commissioner"
+				members={others}
+				value={picked}
+				onChange={(id) => {
+					setPicked(id);
+					setConfirming(false);
+					transfer.reset();
+				}}
+			/>
 			<AnimatePresence mode="wait" initial={false}>
 				{confirming && target ? (
 					<motion.div

@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
 import { BotAccess } from "#/components/BotAccess";
 import { DeleteLeague } from "#/components/DeleteLeague";
+import { RemoveMember } from "#/components/RemoveMember";
 import { TransferCommissioner } from "#/components/TransferCommissioner";
 import { SCORING_MODES } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
@@ -59,6 +60,7 @@ function LeagueSettings() {
 				<>
 					<SettingsForm key={league.id} />
 					<BotAccess leagueId={leagueId} />
+					<RemoveMember leagueId={leagueId} members={members} userId={userId} />
 					<TransferCommissioner
 						leagueId={leagueId}
 						members={members}
