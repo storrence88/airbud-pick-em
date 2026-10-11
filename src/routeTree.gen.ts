@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PicksRouteImport } from './routes/picks'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiRemindersRouteImport } from './routes/api/reminders'
 import { Route as ApiSyncRouteImport } from './routes/api/sync'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
@@ -46,6 +47,11 @@ const PicksRoute = PicksRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPingRoute = ApiPingRouteImport.update({
+  id: '/api/ping',
+  path: '/api/ping',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRemindersRoute = ApiRemindersRouteImport.update({
@@ -125,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
   '/profile': typeof ProfileRoute
+  '/api/ping': typeof ApiPingRoute
   '/api/reminders': typeof ApiRemindersRoute
   '/api/sync': typeof ApiSyncRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
   '/profile': typeof ProfileRoute
+  '/api/ping': typeof ApiPingRoute
   '/api/reminders': typeof ApiRemindersRoute
   '/api/sync': typeof ApiSyncRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -166,6 +174,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
   '/profile': typeof ProfileRoute
+  '/api/ping': typeof ApiPingRoute
   '/api/reminders': typeof ApiRemindersRoute
   '/api/sync': typeof ApiSyncRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/picks'
     | '/profile'
+    | '/api/ping'
     | '/api/reminders'
     | '/api/sync'
     | '/auth/callback'
@@ -208,6 +218,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/picks'
     | '/profile'
+    | '/api/ping'
     | '/api/reminders'
     | '/api/sync'
     | '/auth/callback'
@@ -228,6 +239,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/picks'
     | '/profile'
+    | '/api/ping'
     | '/api/reminders'
     | '/api/sync'
     | '/auth/callback'
@@ -249,6 +261,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PicksRoute: typeof PicksRoute
   ProfileRoute: typeof ProfileRoute
+  ApiPingRoute: typeof ApiPingRoute
   ApiRemindersRoute: typeof ApiRemindersRoute
   ApiSyncRoute: typeof ApiSyncRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
@@ -293,6 +306,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ping': {
+      id: '/api/ping'
+      path: '/api/ping'
+      fullPath: '/api/ping'
+      preLoaderRoute: typeof ApiPingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/reminders': {
@@ -401,6 +421,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PicksRoute: PicksRoute,
   ProfileRoute: ProfileRoute,
+  ApiPingRoute: ApiPingRoute,
   ApiRemindersRoute: ApiRemindersRoute,
   ApiSyncRoute: ApiSyncRoute,
   AuthCallbackRoute: AuthCallbackRoute,

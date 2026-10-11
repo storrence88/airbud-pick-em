@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { ListPageSkeleton } from "#/components/Skeleton";
 import { SCORING_MODES } from "#/lib/scoring";
 import { joinLeague, myLeaguesQuery } from "#/server/leagues";
 
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/leagues/")({
 	loader: ({ context }) =>
 		context.queryClient.ensureQueryData(myLeaguesQuery()),
 	component: MyLeagues,
+	pendingComponent: ListPageSkeleton,
 });
 
 function MyLeagues() {

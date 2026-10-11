@@ -8,6 +8,7 @@ import { ArrowLeft, Check, Crown, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { Avatar } from "#/components/Avatar";
+import { useOnline } from "#/components/ConnectionBanner";
 import { teamLogo } from "#/lib/nfl/teams";
 import type { Game, Team } from "#/lib/nfl/types";
 import {
@@ -176,6 +177,7 @@ function WeekPick({ leagueId }: { leagueId: string }) {
 	const query = survivorQuery(leagueId);
 	const { data } = useSuspenseQuery(query);
 	const [error, setError] = useState("");
+	const online = useOnline();
 	const { pool, state, userId } = data;
 	const games = data.games as Game[];
 	const week = data.currentWeek;
@@ -252,7 +254,13 @@ function WeekPick({ leagueId }: { leagueId: string }) {
 				</span>
 			</div>
 			{error && <p className="mt-3 text-sm text-loss">{error}</p>}
-			<div className="mt-4 grid gap-2 sm:grid-cols-2">
+			<div
+				inert={!online}
+				className={cn(
+					"mt-4 grid gap-2 transition-opacity sm:grid-cols-2",
+					!online && "opacity-60",
+				)}
+			>
 				{games.map((g) => (
 					<div
 						key={g.id}

@@ -10,6 +10,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { MotionConfig } from "motion/react";
 
 import { AppHeader } from "../components/AppHeader";
+import { ConnectionBanner } from "../components/ConnectionBanner";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { teamByAbbr } from "../lib/nfl/teams";
 import { accentColors } from "../lib/team-colors";
@@ -73,6 +74,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<MotionConfig reducedMotion="user">
 					<AppHeader />
 					{children}
+					<ConnectionBanner />
 				</MotionConfig>
 				<TanStackDevtools
 					config={{

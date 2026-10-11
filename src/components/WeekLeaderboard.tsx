@@ -9,6 +9,7 @@ import { cn } from "#/lib/utils";
 import { rankWeek, type WeekRow, weekWinners } from "#/lib/weekly";
 import { leagueWeekQuery, standingsQuery } from "#/server/leagues";
 import { Avatar } from "./Avatar";
+import { RowsSkeleton } from "./Skeleton";
 
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
@@ -121,8 +122,7 @@ export function WeekLeaderboard({ leagueId }: { leagueId: string }) {
 		};
 	}, [data, week, wk, settings]);
 
-	if (isLoading)
-		return <p className="text-muted-foreground">Loading this week…</p>;
+	if (isLoading) return <RowsSkeleton />;
 	if (!data || wk == null)
 		return (
 			<p className="text-sm text-muted-foreground">
