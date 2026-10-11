@@ -12,6 +12,7 @@ import { MotionConfig } from "motion/react";
 import { AppHeader } from "../components/AppHeader";
 import { ConnectionBanner } from "../components/ConnectionBanner";
 import { ServiceWorker } from "../components/ServiceWorker";
+import { WhatsNew } from "../components/WhatsNew";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { teamByAbbr } from "../lib/nfl/teams";
 import { accentVars } from "../lib/team-colors";
@@ -90,6 +91,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 					<AppHeader />
 					{children}
 					<ConnectionBanner />
+					<WhatsNew />
 				</MotionConfig>
 				<TanStackDevtools
 					config={{

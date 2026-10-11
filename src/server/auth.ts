@@ -8,6 +8,8 @@ import {
 export interface SessionUser {
 	id: string;
 	email: string;
+	/** When the account was made; newer accounts get the practice week instead of What's new. */
+	createdAt: string;
 	displayName: string;
 	profile: PublicProfile;
 	/** Tint the app with the favorite team's colors. */
@@ -31,6 +33,7 @@ export const getSessionUser = createServerFn({ method: "GET" }).handler(
 		return {
 			id: data.user.id,
 			email: data.user.email ?? "",
+			createdAt: data.user.created_at,
 			displayName,
 			profile: {
 				display_name: displayName,

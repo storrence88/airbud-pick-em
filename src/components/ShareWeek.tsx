@@ -10,6 +10,7 @@ import {
 	loadCardFonts,
 	loadPhoto,
 } from "#/lib/share-card-draw";
+import { NewDot, useNewDot } from "./NewDot";
 
 async function renderCard(card: ShareCard, player: PublicProfile) {
 	const [photo] = await Promise.all([
@@ -44,16 +45,21 @@ export function ShareWeek({
 	player: PublicProfile;
 }) {
 	const [open, setOpen] = useState(false);
+	const dot = useNewDot("share");
 	return (
 		<>
 			<button
 				type="button"
-				onClick={() => setOpen(true)}
+				onClick={() => {
+					dot.dismiss();
+					setOpen(true);
+				}}
 				aria-label={`Share your week ${card.week}`}
-				className="flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-sm font-semibold transition-colors hover:bg-muted sm:px-3.5"
+				className="relative flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-sm font-semibold transition-colors hover:bg-muted sm:px-3.5"
 			>
 				<Share2 className="size-4" aria-hidden />
 				<span className="hidden sm:inline">Share</span>
+				<NewDot show={dot.show} />
 			</button>
 			<AnimatePresence>
 				{open && (

@@ -1,11 +1,14 @@
 import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
 import { signOut } from "#/server/auth";
 import { Avatar } from "./Avatar";
+import { NewDot, useNewDot } from "./NewDot";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function AppHeader() {
 	const { user } = useRouteContext({ from: "__root__" });
 	const router = useRouter();
+	// Reminders live on the profile page, so the dot points there.
+	const reminders = useNewDot("reminders", !!user);
 
 	return (
 		<header className="sticky top-0 z-30 border-b bg-background/75 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
@@ -35,7 +38,10 @@ export function AppHeader() {
 							className="flex h-10 items-center gap-2 rounded-full pr-1 pl-1 text-muted-foreground transition-colors hover:text-foreground sm:pr-3"
 							activeProps={{ className: "bg-muted !text-foreground" }}
 						>
-							<Avatar profile={user.profile} size={28} />
+							<span className="relative">
+								<Avatar profile={user.profile} size={28} />
+								<NewDot show={reminders.show} className="-top-0.5 -right-0.5" />
+							</span>
 							<span className="hidden max-w-40 truncate sm:inline">
 								{user.displayName}
 							</span>

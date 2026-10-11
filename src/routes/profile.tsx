@@ -10,16 +10,26 @@ import {
 	redirect,
 	useRouter,
 } from "@tanstack/react-router";
-import { BarChart3, Check, ChevronRight, ImageUp, Play } from "lucide-react";
+import {
+	BarChart3,
+	Check,
+	ChevronRight,
+	GraduationCap,
+	ImageUp,
+	Play,
+	Sparkles,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Avatar } from "#/components/Avatar";
+import { NewDot, useNewDot } from "#/components/NewDot";
 import {
 	cardEffect,
 	type EffectKind,
 	PickEffect,
 } from "#/components/PickEffect";
 import { NFL_TEAMS, teamByAbbr, teamLogo } from "#/lib/nfl/teams";
+import { reopenWhatsNew } from "#/lib/onboarding";
 import {
 	LOSS_EFFECTS,
 	type LossEffect,
@@ -72,6 +82,11 @@ function ProfilePage() {
 	const [form, setForm] = useState<MyProfile>(data.profile);
 	const [saved, setSaved] = useState(false);
 	const theme = useResolvedTheme();
+	// Seen once you've been here; the header dot pointed at this section.
+	const remindersDot = useNewDot("reminders");
+	const leaveSeen = useRef(remindersDot.dismiss);
+	leaveSeen.current = remindersDot.dismiss;
+	useEffect(() => () => leaveSeen.current(), []);
 	const set = <K extends keyof MyProfile>(key: K, value: MyProfile[K]) => {
 		setSaved(false);
 		setForm((f) => ({ ...f, [key]: value }));
@@ -221,7 +236,9 @@ function ProfilePage() {
 			</Section>
 
 			<Section
+				id="reminders"
 				title="Pick reminders"
+				dot={remindersDot.show}
 				hint="A few hours before each game day's first kickoff, if you still have open picks."
 			>
 				<Segmented
@@ -248,6 +265,8 @@ function ProfilePage() {
 					onChange={(v) => set("reminder_style", v as "gentle" | "roast")}
 				/>
 			</Section>
+
+			<GettingStarted />
 
 			{/* Save bar slides up once something changes. */}
 			<AnimatePresence>
@@ -348,18 +367,60 @@ function Appearance() {
 	);
 }
 
+/** Replays the practice week or the What's new cards. */
+function GettingStarted() {
+	const { data: leagues } = useQuery(myLeaguesQuery());
+	const first = leagues?.[0]?.league;
+	const row =
+		"flex w-full items-center gap-3 rounded-lg border bg-card px-4 py-3 text-left font-semibold transition-colors hover:bg-muted";
+	return (
+		<Section title="Getting started" hint="A refresher on how it all works.">
+			<div className="grid gap-2">
+				<Link
+					to="/practice"
+					search={first ? { league: first.id, mode: first.mode } : {}}
+					className={row}
+				>
+					<GraduationCap className="size-4 shrink-0 text-primary" aria-hidden />
+					<span className="min-w-0 flex-1">Play the practice week</span>
+					<ChevronRight
+						className="size-4 shrink-0 text-muted-foreground"
+						aria-hidden
+					/>
+				</Link>
+				<button type="button" onClick={reopenWhatsNew} className={row}>
+					<Sparkles className="size-4 shrink-0 text-primary" aria-hidden />
+					<span className="min-w-0 flex-1">See what's new</span>
+					<ChevronRight
+						className="size-4 shrink-0 text-muted-foreground"
+						aria-hidden
+					/>
+				</button>
+			</div>
+		</Section>
+	);
+}
+
 function Section({
+	id,
 	title,
 	hint,
+	dot = false,
 	children,
 }: {
+	id?: string;
 	title: string;
 	hint?: string;
+	/** A "new" dot beside the title. */
+	dot?: boolean;
 	children: ReactNode;
 }) {
 	return (
-		<section className="mt-10">
-			<h2 className="font-display text-xl font-semibold uppercase">{title}</h2>
+		<section id={id} className="mt-10 scroll-mt-20">
+			<h2 className="relative inline-block pr-3 font-display text-xl font-semibold uppercase">
+				{title}
+				<NewDot show={dot} className="top-1 right-0" />
+			</h2>
 			{hint && <p className="mt-1 text-sm text-muted-foreground">{hint}</p>}
 			<div className="mt-4 grid gap-5">{children}</div>
 		</section>

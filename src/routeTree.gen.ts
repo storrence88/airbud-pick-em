@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PicksRouteImport } from './routes/picks'
+import { Route as PracticeRouteImport } from './routes/practice'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiRemindersRouteImport } from './routes/api/reminders'
@@ -42,6 +43,11 @@ const LoginRoute = LoginRouteImport.update({
 const PicksRoute = PicksRouteImport.update({
   id: '/picks',
   path: '/picks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PracticeRoute = PracticeRouteImport.update({
+  id: '/practice',
+  path: '/practice',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
+  '/practice': typeof PracticeRoute
   '/profile': typeof ProfileRoute
   '/api/ping': typeof ApiPingRoute
   '/api/reminders': typeof ApiRemindersRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
+  '/practice': typeof PracticeRoute
   '/profile': typeof ProfileRoute
   '/api/ping': typeof ApiPingRoute
   '/api/reminders': typeof ApiRemindersRoute
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/picks': typeof PicksRoute
+  '/practice': typeof PracticeRoute
   '/profile': typeof ProfileRoute
   '/api/ping': typeof ApiPingRoute
   '/api/reminders': typeof ApiRemindersRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/picks'
+    | '/practice'
     | '/profile'
     | '/api/ping'
     | '/api/reminders'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/picks'
+    | '/practice'
     | '/profile'
     | '/api/ping'
     | '/api/reminders'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/picks'
+    | '/practice'
     | '/profile'
     | '/api/ping'
     | '/api/reminders'
@@ -260,6 +272,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   PicksRoute: typeof PicksRoute
+  PracticeRoute: typeof PracticeRoute
   ProfileRoute: typeof ProfileRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiRemindersRoute: typeof ApiRemindersRoute
@@ -299,6 +312,13 @@ declare module '@tanstack/react-router' {
       path: '/picks'
       fullPath: '/picks'
       preLoaderRoute: typeof PicksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/practice': {
+      id: '/practice'
+      path: '/practice'
+      fullPath: '/practice'
+      preLoaderRoute: typeof PracticeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -420,6 +440,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   PicksRoute: PicksRoute,
+  PracticeRoute: PracticeRoute,
   ProfileRoute: ProfileRoute,
   ApiPingRoute: ApiPingRoute,
   ApiRemindersRoute: ApiRemindersRoute,
