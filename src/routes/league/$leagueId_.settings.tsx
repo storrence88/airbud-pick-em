@@ -8,6 +8,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
 import { BotAccess } from "#/components/BotAccess";
+import { DeleteLeague } from "#/components/DeleteLeague";
 import { TransferCommissioner } from "#/components/TransferCommissioner";
 import { SCORING_MODES } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
@@ -63,6 +64,7 @@ function LeagueSettings() {
 						members={members}
 						userId={userId}
 					/>
+					<DeleteLeague leagueId={leagueId} leagueName={league.name} />
 				</>
 			) : (
 				<p className="mt-6 rounded-lg border bg-card px-4 py-3 text-muted-foreground">

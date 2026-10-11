@@ -446,3 +446,25 @@ export const transferCommissioner = createServerFn({ method: "POST" })
 					: error.message,
 			);
 	});
+
+/** Deletes the league and everything in it, once the name is typed to confirm. */
+export const deleteLeague = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			confirmName: z.string(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { error } = await sb.rpc("delete_league", {
+			p_league: data.leagueId,
+			p_confirm_name: data.confirmName,
+		});
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Only the league commissioner can delete the league."
+					: error.message,
+			);
+	});
