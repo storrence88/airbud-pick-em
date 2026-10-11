@@ -522,3 +522,17 @@ export const removeMember = createServerFn({ method: "POST" })
 					: error.message,
 			);
 	});
+
+/** Takes the signed-in member out of a league. Their finished games stay in the standings. */
+export const leaveLeague = createServerFn({ method: "POST" })
+	.inputValidator(z.object({ leagueId: z.string().uuid() }))
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { error } = await sb.rpc("leave_league", { p_league: data.leagueId });
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Transfer the commissioner role before leaving the league."
+					: error.message,
+			);
+	});
