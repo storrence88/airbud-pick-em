@@ -10,6 +10,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfidenceBoard } from "#/components/ConfidenceBoard";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
+import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
 import { Standings } from "#/components/Standings";
 import {
@@ -128,6 +129,11 @@ function LeaguePage() {
 					)}
 				</motion.div>
 			</AnimatePresence>
+			<LeaveLeague
+				leagueId={leagueId}
+				leagueName={league.name}
+				isCommissioner={isCommissioner}
+			/>
 		</main>
 	);
 }
