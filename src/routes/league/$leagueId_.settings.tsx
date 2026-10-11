@@ -10,6 +10,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { BotAccess } from "#/components/BotAccess";
 import { DeleteLeague } from "#/components/DeleteLeague";
 import { RemoveMember } from "#/components/RemoveMember";
+import { ResetInvite } from "#/components/ResetInvite";
 import { TransferCommissioner } from "#/components/TransferCommissioner";
 import { SCORING_MODES } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
@@ -59,6 +60,7 @@ function LeagueSettings() {
 			{isCommissioner ? (
 				<>
 					<SettingsForm key={league.id} />
+					<ResetInvite leagueId={leagueId} code={league.invite_code} />
 					<BotAccess leagueId={leagueId} />
 					<RemoveMember leagueId={leagueId} members={members} userId={userId} />
 					<TransferCommissioner
