@@ -8,6 +8,8 @@ import {
 	createFileRoute,
 	Link,
 	redirect,
+	useNavigate,
+	useRouteContext,
 	useRouterState,
 } from "@tanstack/react-router";
 import {
@@ -26,6 +28,7 @@ import { useOnline } from "#/components/ConnectionBanner";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
+import { RookieChecklist } from "#/components/RookieChecklist";
 import { ShareWeek } from "#/components/ShareWeek";
 import { LeaguePageSkeleton } from "#/components/Skeleton";
 import { Standings } from "#/components/Standings";
@@ -43,6 +46,7 @@ import {
 import { enteredNote } from "#/lib/entered";
 import { fadedThePublic } from "#/lib/faded";
 import type { Game } from "#/lib/nfl/types";
+import { isVeteran, readOnboarding, updateOnboarding } from "#/lib/onboarding";
 import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 import { shareCard } from "#/lib/share-card";
 import { tiebreakerGameId } from "#/lib/tiebreaker";
@@ -117,6 +121,19 @@ function LeaguePage() {
 	const isCommissioner = data.members.some(
 		(m) => m.user_id === data.userId && m.role === "commissioner",
 	);
+
+	// New players get the practice week the first time they open a league,
+	// offered once so the back button doesn't bounce them into it again.
+	const { user } = useRouteContext({ from: "__root__" });
+	const navigate = useNavigate();
+	useEffect(() => {
+		if (!user || isVeteran(user) || readOnboarding().practice) return;
+		updateOnboarding((s) => ({ ...s, practice: true }));
+		navigate({
+			to: "/practice",
+			search: { league: leagueId, mode: league.mode },
+		});
+	}, [user, leagueId, league.mode, navigate]);
 
 	return (
 		<main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
@@ -520,6 +537,13 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 				</div>
 			)}
 			{error && <p className="mt-3 text-sm text-loss">{error}</p>}
+			{!past && (
+				<RookieChecklist
+					picks={mine.size}
+					hasLock={[...mine.values()].some((p) => p.is_lock)}
+					hasTiebreaker={!!tbGame && mine.get(tbGame.id)?.tiebreaker != null}
+				/>
+			)}
 			{past && (
 				<WeekResults
 					key={`results-${shown}`}
@@ -583,7 +607,7 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 						isConfidence && !past && view === "rank" && "hidden lg:grid",
 					)}
 				>
-					{games.map((g) => {
+					{games.map((g, i) => {
 						const myPick = mine.get(g.id);
 						const locked = g.state !== "pre";
 						const others: Record<string, string[]> = {};
@@ -627,6 +651,7 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 								onPick={(team) => choose(g, team)}
 								lineText={league.mode === "spread" ? lineText(g) : g.spreadText}
 								lockedSpread={league.mode === "spread" ? g.lockedSpread : null}
+								newDetails={i === 0}
 								others={others}
 								note={enteredNote(
 									data.picks.filter(
@@ -694,6 +719,7 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 					)}
 					saving={tiebreaker.isPending}
 					onSave={(points) => tiebreaker.mutate({ gameId: tbGame.id, points })}
+					newDot={!past}
 				/>
 			)}
 			<PublicPicksNote games={games} />

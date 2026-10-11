@@ -93,3 +93,40 @@ export const updateProfile = createServerFn({ method: "POST" })
 		const { error } = await sb.from("profiles").update(data).eq("id", user.id);
 		if (error) throw new Error(error.message);
 	});
+
+const onboardingSchema = z.object({
+	player: z.enum(["new", "veteran"]).optional(),
+	whatsNew: z.string().max(20).optional(),
+	practice: z.boolean().optional(),
+	dots: z
+		.object({
+			release: z.string().max(20),
+			since: z.number(),
+			seen: z
+				.array(
+					z.enum([
+						"survivor",
+						"share",
+						"game-details",
+						"tiebreaker",
+						"reminders",
+					]),
+				)
+				.max(10),
+		})
+		.optional(),
+	rookie: z.enum(["done", "dismissed"]).optional(),
+	installed: z.boolean().optional(),
+});
+
+/** Saves what the player has seen of the onboarding (see #/lib/onboarding). */
+export const saveOnboarding = createServerFn({ method: "POST" })
+	.inputValidator(onboardingSchema)
+	.handler(async ({ data }) => {
+		const { sb, user } = await requireUser();
+		const { error } = await sb
+			.from("profiles")
+			.update({ onboarding: data })
+			.eq("id", user.id);
+		if (error) throw new Error(error.message);
+	});

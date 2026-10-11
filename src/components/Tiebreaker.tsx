@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Game } from "#/lib/nfl/types";
 import { MAX_TIEBREAKER } from "#/lib/tiebreaker";
 import { cn } from "#/lib/utils";
+import { NewDot, useNewDot } from "./NewDot";
 
 export interface Guess {
 	userId: string;
@@ -22,6 +23,7 @@ export function Tiebreaker({
 	others,
 	saving,
 	onSave,
+	newDot = false,
 }: {
 	game: Game;
 	picked: boolean;
@@ -29,7 +31,10 @@ export function Tiebreaker({
 	others: Guess[];
 	saving: boolean;
 	onSave: (points: number | null) => void;
+	/** Point out the tiebreaker to players who were here before it existed. */
+	newDot?: boolean;
 }) {
+	const dot = useNewDot("tiebreaker", newDot);
 	const locked = game.state !== "pre";
 	const total = game.homeScore + game.awayScore;
 	const [draft, setDraft] = useState(guess == null ? "" : String(guess));
@@ -56,8 +61,9 @@ export function Tiebreaker({
 		<div className="mt-6 rounded-lg border bg-card p-4">
 			<div className="flex items-start justify-between gap-3">
 				<div className="min-w-0">
-					<div className="text-xs font-semibold uppercase tracking-wider text-primary">
+					<div className="relative inline-block pr-3 text-xs font-semibold uppercase tracking-wider text-primary">
 						Monday night tiebreaker
+						<NewDot show={dot.show} className="top-0 right-0" />
 					</div>
 					<p className="mt-1 text-sm text-muted-foreground">
 						Total points in {matchup}. Weekly ties go to the closest guess.
@@ -122,6 +128,7 @@ export function Tiebreaker({
 							value={draft}
 							disabled={!picked}
 							onChange={(e) => setDraft(e.target.value)}
+							onFocus={dot.dismiss}
 							placeholder={picked ? "e.g. 45" : "–"}
 							className="h-10 w-28 rounded-full border bg-background px-4 text-base tabular-nums outline-none focus:border-primary disabled:opacity-50 sm:text-sm"
 						/>
