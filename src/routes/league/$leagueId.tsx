@@ -20,6 +20,7 @@ import {
 	type RankedPick,
 	settle,
 } from "#/lib/confidence";
+import { enteredNote } from "#/lib/entered";
 import { fadedThePublic } from "#/lib/faded";
 import type { Game } from "#/lib/nfl/types";
 import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
@@ -48,7 +49,10 @@ export const Route = createFileRoute("/league/$leagueId")({
 	),
 });
 
-type WeekGame = Game & { lockedSpread: number | null };
+type WeekGame = Game & {
+	lockedSpread: number | null;
+	crowdHomePct: number | null;
+};
 
 /** "KC -3.5" style text from the home team's line. */
 function lineText(g: WeekGame) {
@@ -216,6 +220,11 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 					team: vars.team,
 					confidence: vars.confidence,
 					is_lock: mine.get(vars.gameId)?.is_lock ?? false,
+					// Choosing a team yourself clears the commissioner's note.
+					entered_by:
+						mine.get(vars.gameId)?.team === vars.team
+							? (mine.get(vars.gameId)?.entered_by ?? null)
+							: null,
 				},
 			]);
 			return { prev };
@@ -434,7 +443,10 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 						}
 						const fade = fadedThePublic(
 							g,
-							g.publicPicks,
+							// Prefer the split saved at lock; fall back to the live feed.
+							g.crowdHomePct != null
+								? { home: g.crowdHomePct, away: 100 - g.crowdHomePct }
+								: g.publicPicks,
 							data.picks,
 							league.mode,
 						);
@@ -459,6 +471,14 @@ function WeekPicks({ leagueId }: { leagueId: string }) {
 								onPick={(team) => choose(g, team)}
 								lineText={league.mode === "spread" ? lineText(g) : g.spreadText}
 								others={others}
+								note={enteredNote(
+									data.picks.filter(
+										(p) =>
+											p.game_id === g.id && (locked || p.user_id === userId),
+									),
+									userId,
+									names,
+								)}
 								lock={
 									myPick && (!lockInPlay || myPick.is_lock)
 										? {

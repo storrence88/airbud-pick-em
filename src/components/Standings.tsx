@@ -4,6 +4,7 @@ import {
 	useQueryClient,
 	useSuspenseQuery,
 } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
 	BadgeCheck,
 	Crown,
@@ -88,6 +89,7 @@ export function Standings({ leagueId }: { leagueId: string }) {
 					return (
 						<StandingRow
 							key={r.userId}
+							leagueId={leagueId}
 							rank={i + 1}
 							member={m}
 							me={r.userId === week.userId}
@@ -123,9 +125,14 @@ export function Standings({ leagueId }: { leagueId: string }) {
 										size={28}
 										className="opacity-60 grayscale"
 									/>
-									<span className="min-w-0 flex-1 truncate">
+									<Link
+										to="/league/$leagueId/stats/$userId"
+										params={{ leagueId, userId: r.userId }}
+										title="Season stats"
+										className="min-w-0 flex-1 truncate underline-offset-4 hover:underline"
+									>
 										{f.display_name}
-									</span>
+									</Link>
 									<span className="font-display text-lg font-bold tabular-nums">
 										{r.total}
 									</span>
@@ -146,6 +153,7 @@ export function Standings({ leagueId }: { leagueId: string }) {
 }
 
 function StandingRow({
+	leagueId,
 	rank,
 	member,
 	me,
@@ -155,6 +163,7 @@ function StandingRow({
 	weekLabel,
 	total,
 }: {
+	leagueId: string;
 	rank: number;
 	member: Member;
 	me: boolean;
@@ -183,9 +192,14 @@ function StandingRow({
 				<Avatar profile={member} size={36} />
 				<div className="min-w-0 flex-1">
 					<div className="flex min-w-0 items-center gap-1.5">
-						<span className="truncate font-semibold">
+						<Link
+							to="/league/$leagueId/stats/$userId"
+							params={{ leagueId, userId: member.user_id }}
+							title="Season stats"
+							className="truncate font-semibold underline-offset-4 hover:underline"
+						>
 							{member.display_name}
-						</span>
+						</Link>
 						{streak >= FLAME_AT && <StreakFlame streak={streak} />}
 						{lastPlace && (
 							<span

@@ -1,4 +1,4 @@
-import { Check, Lock, Sparkles, Star } from "lucide-react";
+import { Check, Lock, PencilLine, Sparkles, Star } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
@@ -15,6 +15,8 @@ interface Props {
 	/** Names of other members who picked each team (shown once the game locks). */
 	others?: Record<string, string[]>;
 	footer?: ReactNode;
+	/** Says which picks here the commissioner entered for someone. */
+	note?: string | null;
 	/** Lock of the Week control for your pick in this game. */
 	lock?: { on: boolean; onToggle: () => void } | null;
 	/** A result effect to play once; cleared through onEffectDone. */
@@ -39,6 +41,7 @@ export function GameCard({
 	lineText,
 	others,
 	footer,
+	note,
 	lock,
 	effect,
 	onEffectDone,
@@ -127,6 +130,12 @@ export function GameCard({
 					<span className="truncate">{others[game.home.abbr]?.join(", ")}</span>
 				</div>
 			) : null}
+			{note && (
+				<p className="flex items-center gap-1.5 px-4 pb-3 text-xs text-muted-foreground">
+					<PencilLine className="size-3.5 shrink-0" aria-hidden />
+					{note}
+				</p>
+			)}
 			{footer}
 			{effect && onEffectDone && (
 				<PickEffect

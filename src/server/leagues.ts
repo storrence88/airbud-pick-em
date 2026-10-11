@@ -38,6 +38,8 @@ export interface PickRow {
 	team: string;
 	confidence: number | null;
 	is_lock: boolean;
+	/** The commissioner who entered this pick for the member, if they didn't. */
+	entered_by: string | null;
 }
 
 export interface TrashTalk {
@@ -45,7 +47,7 @@ export interface TrashTalk {
 	body: string;
 }
 
-const PICK_COLUMNS = "user_id, game_id, team, confidence, is_lock";
+const PICK_COLUMNS = "user_id, game_id, team, confidence, is_lock, entered_by";
 
 async function requireUser() {
 	const sb = getSupabaseServerClient();
@@ -174,12 +176,19 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 		const failed = membersError ?? picksError;
 		if (failed) throw new Error(failed.message);
 		// Locked spreads come from our DB so ATS uses the frozen line, not the live one.
+		// "*" so the saved crowd split (migration 0018) is read when it exists.
 		const { data: locked } = await sb
 			.from("games")
-			.select("id, locked_spread")
+			.select("*")
 			.in("id", gameIds);
-		const lockedById = Object.fromEntries(
-			(locked ?? []).map((r) => [r.id, r.locked_spread as number | null]),
+		const lockedById = new Map(
+			(locked ?? []).map((r) => [
+				r.id as string,
+				{
+					spread: r.locked_spread as number | null,
+					crowd: (r.crowd_home_pct ?? null) as number | null,
+				},
+			]),
 		);
 
 		// Removed members' kept picks belong to the standings, not this week.
@@ -191,7 +200,9 @@ export const getLeagueWeek = createServerFn({ method: "GET" })
 			league: league as League,
 			games: games.map((g) => ({
 				...g,
-				lockedSpread: lockedById[g.id] ?? null,
+				lockedSpread: lockedById.get(g.id)?.spread ?? null,
+				/** ESPN's home share saved at lock; null until it's stored. */
+				crowdHomePct: lockedById.get(g.id)?.crowd ?? null,
 			})),
 			members: roster,
 			picks: ((picks ?? []) as PickRow[]).filter((p) =>
@@ -238,6 +249,38 @@ export const savePick = createServerFn({ method: "POST" })
 					: error.message,
 			);
 		return confidence as number | null;
+	});
+
+/**
+ * The commissioner enters a pick a member sent in, before kickoff. In confidence
+ * leagues it takes their next open value unless one is asked for. Nothing about
+ * the member's other picks comes back.
+ */
+export const enterPickFor = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			userId: z.string().uuid(),
+			gameId: z.string(),
+			team: z.string().min(2).max(4),
+			confidence: z.number().int().min(1).max(20).nullable(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { error } = await sb.rpc("enter_pick_for", {
+			p_league: data.leagueId,
+			p_user: data.userId,
+			p_game: data.gameId,
+			p_team: data.team,
+			p_confidence: data.confidence,
+		});
+		if (error)
+			throw new Error(
+				error.code === "42501"
+					? "Only the league commissioner can enter picks for others."
+					: error.message,
+			);
 	});
 
 /** Re-ranks picks in one transaction; the DB rejects any value used twice in a week. */
