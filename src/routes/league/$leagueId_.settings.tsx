@@ -15,11 +15,12 @@ import { RemoveMember } from "#/components/RemoveMember";
 import { ResetInvite } from "#/components/ResetInvite";
 import { SurvivorSettings } from "#/components/SurvivorSettings";
 import { TransferCommissioner } from "#/components/TransferCommissioner";
-import { SCORING_MODES } from "#/lib/scoring";
+import { SCORING_MODES, type ScoringMode } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
 import {
 	leagueSettingsQuery,
 	PUSH_VALUES,
+	setLeagueMode,
 	updateLeagueSettings,
 } from "#/server/leagues";
 
@@ -149,9 +150,8 @@ function SettingsForm() {
 						{mode.tagline}
 					</span>
 				</div>
-				<p className="mt-1 text-sm text-muted-foreground">
-					The scoring mode is set when the league is created.
-				</p>
+				<p className="mt-1 text-sm text-muted-foreground">{mode.explanation}</p>
+				<ChangeMode leagueId={leagueId} current={league.mode} />
 				{league.mode === "spread" && (
 					<div className="mt-5 border-t pt-4">
 						<div className="flex flex-wrap items-center justify-between gap-3">
@@ -201,6 +201,105 @@ function SettingsForm() {
 				</button>
 			</div>
 		</form>
+	);
+}
+
+/** Switches the scoring mode after a confirm, since it rescores the whole season. */
+function ChangeMode({
+	leagueId,
+	current,
+}: {
+	leagueId: string;
+	current: ScoringMode;
+}) {
+	const qc = useQueryClient();
+	const [open, setOpen] = useState(false);
+	const [choice, setChoice] = useState<ScoringMode>(current);
+	const change = useMutation({
+		mutationFn: () => setLeagueMode({ data: { leagueId, mode: choice } }),
+		onSuccess: async () => {
+			await qc.invalidateQueries({ queryKey: ["league", leagueId] });
+			await qc.invalidateQueries({ queryKey: ["leagues"] });
+			setOpen(false);
+		},
+	});
+
+	if (!open)
+		return (
+			<button
+				type="button"
+				onClick={() => {
+					setChoice(current);
+					change.reset();
+					setOpen(true);
+				}}
+				className="mt-3 text-sm font-semibold text-primary hover:underline"
+			>
+				Change scoring
+			</button>
+		);
+
+	return (
+		<div className="mt-4 border-t pt-4">
+			<fieldset className="grid gap-2">
+				<legend className="sr-only">Scoring mode</legend>
+				{(Object.keys(SCORING_MODES) as ScoringMode[]).map((m) => (
+					<label
+						key={m}
+						className={cn(
+							"flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 transition-colors has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-ring/40",
+							choice === m ? "border-primary bg-primary/5" : "hover:bg-muted",
+						)}
+					>
+						<input
+							type="radio"
+							name="scoring-mode"
+							value={m}
+							checked={choice === m}
+							onChange={() => setChoice(m)}
+							className="sr-only"
+						/>
+						<span className="flex-1 font-semibold">
+							{SCORING_MODES[m].label}
+						</span>
+						<span className="text-xs text-muted-foreground">
+							{m === current ? "Current" : SCORING_MODES[m].tagline}
+						</span>
+					</label>
+				))}
+			</fieldset>
+			{choice !== current && (
+				<p className="mt-3 text-sm text-muted-foreground">
+					This rescores the whole season, including weeks already played.
+					{choice === "confidence" &&
+						" Everyone's open picks this week get points to rank, and picks already made here on games that have been played score 0 until you import that week from Yahoo."}
+				</p>
+			)}
+			{change.error && (
+				<p className="mt-2 text-sm text-loss">
+					{(change.error as Error).message}
+				</p>
+			)}
+			<div className="mt-3 flex justify-end gap-2">
+				<button
+					type="button"
+					onClick={() => setOpen(false)}
+					className="h-10 rounded-full px-4 font-semibold text-muted-foreground hover:text-foreground"
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					onClick={() => change.mutate()}
+					disabled={choice === current || change.isPending}
+					className="h-10 rounded-full bg-primary px-5 font-semibold text-primary-foreground transition-[transform,opacity] active:scale-95 disabled:opacity-50"
+				>
+					{change.isPending
+						? "Switching…"
+						: `Switch to ${SCORING_MODES[choice].label}`}
+				</button>
+			</div>
+		</div>
 	);
 }
 

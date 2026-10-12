@@ -620,6 +620,28 @@ export const updateLeagueSettings = createServerFn({ method: "POST" })
 		return league as League;
 	});
 
+/** Changes how the league is scored, for the whole season. The DB checks you're the commissioner. */
+export const setLeagueMode = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			mode: z.enum(["straight", "spread", "confidence"]),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		const { error } = await sb.rpc("set_league_mode", {
+			p_league: data.leagueId,
+			p_mode: data.mode,
+		});
+		if (error)
+			throw new Error(
+				error.code === "PGRST202"
+					? "Run migration 0028 in Supabase first."
+					: error.message,
+			);
+	});
+
 /** Hands the commissioner role to another member; you become a regular member. */
 export const transferCommissioner = createServerFn({ method: "POST" })
 	.inputValidator(
