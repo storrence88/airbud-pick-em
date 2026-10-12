@@ -10,6 +10,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { BotAccess } from "#/components/BotAccess";
 import { DeleteLeague } from "#/components/DeleteLeague";
 import { EnterPick } from "#/components/EnterPick";
+import { ImportYahoo } from "#/components/ImportYahoo";
 import { RemoveMember } from "#/components/RemoveMember";
 import { ResetInvite } from "#/components/ResetInvite";
 import { SurvivorSettings } from "#/components/SurvivorSettings";
@@ -68,6 +69,7 @@ function LeagueSettings() {
 						members={members}
 						userId={userId}
 					/>
+					<ImportYahoo league={league} members={members} />
 					<ResetInvite leagueId={leagueId} code={league.invite_code} />
 					<SurvivorSettings leagueId={leagueId} />
 					<BotAccess leagueId={leagueId} />

@@ -293,6 +293,53 @@ export const enterPickFor = createServerFn({ method: "POST" })
 			);
 	});
 
+/**
+ * The commissioner brings over a finished week from Yahoo Pick'em: each listed
+ * player's picks that week are replaced with the imported ones.
+ */
+export const importWeekPicks = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			leagueId: z.string().uuid(),
+			week: z.number().int().min(1).max(18),
+			rows: z
+				.array(
+					z.object({
+						userId: z.string().uuid(),
+						picks: z
+							.array(
+								z.object({
+									gameId: z.string().max(20),
+									team: z.string().min(2).max(4),
+									confidence: z.number().int().min(1).max(20).nullable(),
+								}),
+							)
+							.max(20),
+						tiebreaker: z.number().int().min(0).max(MAX_TIEBREAKER).nullable(),
+					}),
+				)
+				.min(1)
+				.max(50),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { sb } = await requireUser();
+		// Weeks from before the league started may not be saved yet.
+		await syncWeek(data.week);
+		const { data: saved, error } = await sb.rpc("import_week_picks", {
+			p_league: data.leagueId,
+			p_week: data.week,
+			p_rows: data.rows,
+		});
+		if (error)
+			throw new Error(
+				error.code === "PGRST202"
+					? "Run migration 0027 in Supabase first."
+					: error.message,
+			);
+		return saved as number;
+	});
+
 /** Re-ranks picks in one transaction; the DB rejects any value used twice in a week. */
 export const setConfidence = createServerFn({ method: "POST" })
 	.inputValidator(
