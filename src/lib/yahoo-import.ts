@@ -105,12 +105,44 @@ function splitName(line: string): [string, string] {
 	const colon = line.indexOf(":");
 	if (colon >= 0) return [line.slice(0, colon), line.slice(colon + 1)];
 	// No separator: the name runs up to the first team or number.
-	const words = line.split(/\s+/);
-	const at = words.findIndex(
-		(w) => /^\d/.test(w) || teamFromWord(w.replace(/[^\w]/g, "")),
-	);
-	if (at <= 0) return ["", line];
+	const words = line.trim().split(/\s+/);
+	const at = words.findIndex(isPickWord);
+	if (at < 0) return [line, ""];
+	if (at === 0) return ["", line];
 	return [words.slice(0, at).join(" "), words.slice(at).join(" ")];
+}
+
+/** A team or a points value ("16", "(16)", "3.5"), as opposed to part of a name. */
+function isPickWord(word: string) {
+	return (
+		/^\(?\d+(\.\d+)?\)?$/.test(word) ||
+		teamFromWord(word.replace(/[^\w]/g, "")) !== undefined
+	);
+}
+
+/** True when a line carries on the row before it instead of starting a player. */
+function continuesRow(line: string) {
+	const name = splitName(line)[0].trim();
+	return !name || isPickWord(name);
+}
+
+// Row labels in Yahoo's group picks table that aren't players.
+const TABLE_LABELS = new Set(["favored", "underdog", "spread", "team name"]);
+
+/**
+ * The pasted lines, one per player. Yahoo shows each pick as the team over its
+ * points ("Sea" then "(10)"), so a copy can break a row across lines. A line
+ * that doesn't start with a name belongs to the line before it.
+ */
+function joinCells(text: string): string[] {
+	const lines: string[] = [];
+	for (const line of text.split(/\r?\n/)) {
+		if (!line.trim()) continue;
+		if (lines.length && continuesRow(line))
+			lines[lines.length - 1] += ` ${line.trim()}`;
+		else lines.push(line);
+	}
+	return lines;
 }
 
 /**
@@ -131,9 +163,9 @@ export function parseWeekPaste(
 	const tbGame = tiebreakerGameId(games);
 	const rows: ImportRow[] = [];
 
-	for (const line of text.split(/\r?\n/)) {
-		if (!line.trim()) continue;
+	for (const line of joinCells(text)) {
 		const [rawName, rest] = splitName(line);
+		if (TABLE_LABELS.has(rawName.trim().toLowerCase())) continue;
 		const tokens = tokenize(rest);
 
 		const picks: ImportPick[] = [];

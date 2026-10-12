@@ -169,8 +169,9 @@ function Importer({ league, members }: { league: League; members: Member[] }) {
 	return (
 		<div className="border-t px-4 py-4 text-sm">
 			<p className="text-muted-foreground">
-				On Yahoo, open your group's picks for a week, select the whole table and
-				copy it, then paste it here. Typing one player per line works too:
+				On Yahoo, open Group Picks for a week, drag to select the whole table
+				(from "Favored" down to the last player's points), copy it and paste it
+				here. Typing one player per line works too:
 			</p>
 			<pre className="mt-2 overflow-x-auto rounded-md bg-muted px-3 py-2 text-xs">
 				Steven: KC 16, BUF 15, DAL 14, … tiebreaker 45

@@ -129,3 +129,99 @@ describe("guessMember", () => {
 		expect(guessMember("Zed", members)).toBeNull();
 	});
 });
+
+describe("parseWeekPaste with Yahoo's group picks table", () => {
+	// Week 1, 2026, as Yahoo shows it (favorite first in each game).
+	const week1: ImportGame[] = [
+		["SEA", "NE"],
+		["LAR", "SF"],
+		["CIN", "TB"],
+		["DET", "NO"],
+		["TEN", "NYJ"],
+		["BAL", "IND"],
+		["PIT", "ATL"],
+		["CHI", "CAR"],
+		["JAX", "CLE"],
+		["BUF", "HOU"],
+		["LV", "MIA"],
+		["MIN", "GB"],
+		["PHI", "WSH"],
+		["LAC", "ARI"],
+		["DAL", "NYG"],
+		["KC", "DEN"],
+	].map(([home, away], i) => ({
+		id: String(i + 1),
+		home,
+		away,
+		kickoff: `2026-09-13T${String(10 + i).padStart(2, "0")}:00:00Z`,
+	}));
+	const players: [string, string, number][] = [
+		[
+			"JockGPT",
+			"Sea (10) LAR (9) Cin (11) Det (14) Ten (3) Bal (12) Pit (8) Chi (7) Jax (15) Hou (1) LV (6) GB (2) Phi (13) LAC (16) Dal (5) Den (4)",
+			96,
+		],
+		[
+			"100% All Picks Correct [REAL]",
+			"Sea (9) LAR (10) TB (6) Det (14) Ten (5) Bal (8) Pit (13) Chi (11) Jax (12) Buf (1) LV (7) GB (3) Phi (15) LAC (16) Dal (2) KC (4)",
+			94,
+		],
+	];
+	const header = [
+		"Favored\tSea\tLAR\tCin\tDet\tTen\tBal\tPit\tChi\tJax\tBuf\tLV\tMin\tPhi\tLAC\tDal\tKC\t",
+		"Spread\t3.5\t3.5\t3.5\t7.0\t1.5\t3.5\t3.5\t2.5\t8.5\t1.5\t3.5\t1.5\t5.0\t10.0\t2.5\t3.0\t",
+		"Underdog\tNE\tSF\tTB\tNO\tNYJ\tInd\tAtl\tCar\tCle\tHou\tMia\tGB\tWas\tAri\tNYG\tDen\t",
+		"Team Name\tPoints",
+	];
+	const expectRows = (rows: ReturnType<typeof parseWeekPaste>) => {
+		expect(rows.map((r) => r.name)).toEqual(players.map(([n]) => n));
+		for (const r of rows) {
+			expect(r.picks).toHaveLength(16);
+			expect(r.problems).toEqual([]);
+		}
+		expect(rows[0].picks[9]).toEqual({
+			gameId: "10",
+			team: "HOU",
+			confidence: 1,
+		});
+		expect(rows[1].picks[12]).toEqual({
+			gameId: "13",
+			team: "PHI",
+			confidence: 15,
+		});
+	};
+
+	it("reads rows copied one per line", () => {
+		const text = [
+			...header,
+			...players.map(
+				([n, p, pts]) => `${n}\t${p.replace(/\) /g, ")\t")}\t${pts}`,
+			),
+			"Get 'Em Picked\t\t\t\t0",
+		].join("\n");
+		expectRows(parseWeekPaste(text, week1, "confidence"));
+	});
+
+	it("reads cells that break between the team and its points", () => {
+		const text = [
+			...header,
+			...players.map(
+				([n, p, pts]) =>
+					`${n}\t${p.replace(/ \(/g, "\n(").replace(/\) /g, ")\t")}\t${pts}`,
+			),
+		].join("\n");
+		expectRows(parseWeekPaste(text, week1, "confidence"));
+	});
+
+	it("reads every cell on its own line", () => {
+		const text = [
+			...header.flatMap((l) => l.split("\t")),
+			...players.flatMap(([n, p, pts]) => [
+				n,
+				...p.replace(/ \(/g, "\n(").replace(/\) /g, ")\n").split("\n"),
+				String(pts),
+			]),
+		].join("\n");
+		expectRows(parseWeekPaste(text, week1, "confidence"));
+	});
+});
