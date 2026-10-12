@@ -198,7 +198,8 @@ export async function sendEmailReminders({
 			leagues: rows.map(toLeague),
 			seed: `${slate.id}:${userId}`,
 		});
-		const link = `${appUrl.replace(/\/$/, "")}/picks`;
+		// One league goes straight to it; more than one goes to the list.
+		const link = `${appUrl.replace(/\/$/, "")}${rows.length === 1 ? `/league/${rows[0].leagueId}` : "/leagues"}`;
 		const text = `${msg.intro}\n\n${msg.games.join("\n")}\n\nMake your picks: ${link}\n\nChange or turn off reminders on your profile: ${appUrl.replace(/\/$/, "")}/profile`;
 		const html = [
 			`<p>${escapeHtml(msg.intro)}</p>`,

@@ -2,7 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { authErrorMessage } from "#/lib/auth-errors";
 import { getSupabaseServerClient } from "#/lib/supabase.server";
 
-/** Magic-link and Discord landing: swaps the one-time code for a session cookie. */
+/**
+ * Magic-link and Discord landing: swaps the one-time code for a session cookie.
+ * Email links built from the token hash (see the Magic Link template in the
+ * README) work in any browser, unlike `code`, which needs the browser that
+ * asked for the link.
+ */
 export const Route = createFileRoute("/auth/callback")({
 	server: {
 		handlers: {
@@ -22,7 +27,20 @@ export const Route = createFileRoute("/auth/callback")({
 				// Only allow same-site relative redirects.
 				const dest =
 					next?.startsWith("/") && !next.startsWith("//") ? next : "/leagues";
-				if (code) {
+				const tokenHash = url.searchParams.get("token_hash");
+				if (tokenHash) {
+					const { error } = await getSupabaseServerClient().auth.verifyOtp({
+						token_hash: tokenHash,
+						type:
+							url.searchParams.get("type") === "magiclink"
+								? "magiclink"
+								: "email",
+					});
+					if (error)
+						return toLogin(
+							"That sign-in link has expired or was already used. Send a new one.",
+						);
+				} else if (code) {
 					const { error } =
 						await getSupabaseServerClient().auth.exchangeCodeForSession(code);
 					if (error)

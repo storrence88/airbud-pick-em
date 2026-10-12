@@ -59,7 +59,7 @@ export const Route = createFileRoute("/api/bot/reminders")({
 									away: g.away.abbr,
 									home: g.home.abbr,
 								})),
-								message: `${msg.intro}\n${msg.games.join("\n")}\nMake your picks: ${url.origin}/picks`,
+								message: `${msg.intro}\n${msg.games.join("\n")}\nMake your picks: ${url.origin}/league/${ctx.league.id}`,
 							},
 						];
 					}),

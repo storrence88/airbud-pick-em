@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { type EspnScoreboard, parseHomeSpread, parseScoreboard } from "./espn";
+import {
+	type EspnScoreboard,
+	parseHomeSpread,
+	parseScoreboard,
+	regularSeasonStandIn,
+} from "./espn";
 
 describe("parseHomeSpread", () => {
 	it("reads the favorite from details", () => {
@@ -63,5 +68,64 @@ describe("parseScoreboard", () => {
 			state: "pre",
 		});
 		expect(g.home.color).toBe("#e31837");
+	});
+});
+
+describe("regular season only", () => {
+	const event = (id: string, type?: number) => ({
+		id,
+		date: "2027-01-10T18:00Z",
+		season: type ? { year: 2026, type } : undefined,
+		week: { number: 1 },
+		competitions: [
+			{
+				status: { type: { state: "pre" as const } },
+				competitors: [
+					{
+						homeAway: "home" as const,
+						team: {
+							id: "1",
+							abbreviation: "KC",
+							displayName: "Kansas City Chiefs",
+							shortDisplayName: "Chiefs",
+						},
+					},
+					{
+						homeAway: "away" as const,
+						team: {
+							id: "2",
+							abbreviation: "BUF",
+							displayName: "Buffalo Bills",
+							shortDisplayName: "Bills",
+						},
+					},
+				],
+			},
+		],
+	});
+
+	it("drops preseason and playoff games, which reuse weeks 1 to 5", () => {
+		const games = parseScoreboard({
+			season: { year: 2026, type: 3 },
+			events: [event("wildcard", 3), event("pre", 1), event("reg", 2)],
+		});
+		expect(games.map((g) => g.id)).toEqual(["reg"]);
+	});
+
+	it("keeps events when the feed doesn't say the season type", () => {
+		expect(parseScoreboard({ events: [event("x")] })).toHaveLength(1);
+	});
+
+	it("stands in week 18 during the playoffs and week 1 in the preseason", () => {
+		expect(
+			regularSeasonStandIn({ season: { year: 2026, type: 3 }, events: [] }),
+		).toEqual({ season: 2026, week: 18 });
+		expect(
+			regularSeasonStandIn({ season: { year: 2027, type: 1 }, events: [] }),
+		).toEqual({ season: 2027, week: 1 });
+		expect(
+			regularSeasonStandIn({ season: { year: 2026, type: 2 }, events: [] }),
+		).toBeNull();
+		expect(regularSeasonStandIn({ events: [] })).toBeNull();
 	});
 });

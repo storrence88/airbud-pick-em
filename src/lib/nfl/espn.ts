@@ -19,10 +19,18 @@ interface EspnCompetitor {
 	};
 }
 
+/** ESPN season types: 1 preseason, 2 regular season, 3 playoffs, 4 offseason. */
+const REGULAR_SEASON = 2;
+
+interface EspnSeason {
+	year: number;
+	type?: number;
+}
+
 interface EspnEvent {
 	id: string;
 	date: string;
-	season?: { year: number };
+	season?: EspnSeason;
 	week?: { number: number };
 	competitions: {
 		status: { type: { state: GameState; shortDetail?: string } };
@@ -32,7 +40,7 @@ interface EspnEvent {
 }
 
 export interface EspnScoreboard {
-	season?: { year: number };
+	season?: EspnSeason;
 	week?: { number: number };
 	events: EspnEvent[];
 }
@@ -72,8 +80,16 @@ export function parseHomeSpread(
 	return null;
 }
 
+/**
+ * Only regular-season games are pickable. Preseason and playoff weeks reuse
+ * the numbers 1 to 5, so saving them would mix them into the real weeks.
+ */
+const isRegularSeason = (ev: EspnEvent, data: EspnScoreboard) =>
+	(ev.season?.type ?? data.season?.type ?? REGULAR_SEASON) === REGULAR_SEASON;
+
 export function parseScoreboard(data: EspnScoreboard): Game[] {
 	return data.events.flatMap((ev) => {
+		if (!isRegularSeason(ev, data)) return [];
 		const comp = ev.competitions[0];
 		const home = comp?.competitors.find((c) => c.homeAway === "home");
 		const away = comp?.competitors.find((c) => c.homeAway === "away");
@@ -102,16 +118,41 @@ export function parseScoreboard(data: EspnScoreboard): Game[] {
 	});
 }
 
+/**
+ * When ESPN's "current week" is outside the regular season, the week to show
+ * instead: week 1 during the preseason, week 18 once the playoffs start (the
+ * app stays on the final regular-season week until playoff picks exist).
+ */
+export function regularSeasonStandIn(
+	data: EspnScoreboard,
+): { season: number; week: number } | null {
+	const season = data.season;
+	if (!season?.type || season.type === REGULAR_SEASON) return null;
+	return { season: season.year, week: season.type === 1 ? 1 : 18 };
+}
+
+async function fetchScoreboard(opts: { season?: number; week?: number }) {
+	const url = new URL(SCOREBOARD);
+	if (opts.season) url.searchParams.set("dates", String(opts.season));
+	if (opts.week) {
+		url.searchParams.set("week", String(opts.week));
+		url.searchParams.set("seasontype", String(REGULAR_SEASON));
+	}
+	const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+	if (!res.ok) throw new Error(`ESPN scoreboard ${res.status}`);
+	return (await res.json()) as EspnScoreboard;
+}
+
 export const espnProvider: NflProvider = {
 	async getWeek({ season, week } = {}) {
-		const url = new URL(SCOREBOARD);
-		if (season) url.searchParams.set("dates", String(season));
-		if (week) {
-			url.searchParams.set("week", String(week));
-			url.searchParams.set("seasontype", "2");
-		}
-		const res = await fetch(url);
-		if (!res.ok) throw new Error(`ESPN scoreboard ${res.status}`);
-		return parseScoreboard((await res.json()) as EspnScoreboard);
+		const data = await fetchScoreboard({ season, week });
+		const standIn = week ? null : regularSeasonStandIn(data);
+		if (!standIn) return parseScoreboard(data);
+		const games = parseScoreboard(await fetchScoreboard(standIn));
+		// In the offseason ESPN may already be on next year; fall back a season.
+		if (games.length > 0 || season) return games;
+		return parseScoreboard(
+			await fetchScoreboard({ ...standIn, season: standIn.season - 1 }),
+		);
 	},
 };

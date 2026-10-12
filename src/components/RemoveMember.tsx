@@ -17,7 +17,7 @@ const PICK_OPTIONS = [
 		keep: false,
 		label: "Wipe picks",
 		detail:
-			"Every pick, Lock of the Week and trash talk line they made in this league is deleted.",
+			"Every pick, survivor pick, Lock of the Week and trash talk line they made in this league is deleted.",
 	},
 ] as const;
 
