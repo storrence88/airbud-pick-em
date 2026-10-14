@@ -1,6 +1,7 @@
 import { espnProvider } from "#/lib/nfl/espn";
 import { teamByAbbr, teamLogo } from "#/lib/nfl/teams";
 import type { Game, Team } from "#/lib/nfl/types";
+import { weekIsOver } from "#/lib/nfl/week";
 import { getSupabaseAdminClient } from "#/lib/supabase.server";
 
 export interface GameRow {
@@ -92,24 +93,35 @@ export function fromRow(row: GameRow): Game {
 
 /**
  * The week as last saved: that week of the newest season, or for the current
- * week the first one with a game not yet final (else the latest week).
+ * week the first one that isn't over yet by the same rule as live (else the
+ * latest week).
  */
 async function savedWeek(week?: number): Promise<Game[]> {
 	const admin = getSupabaseAdminClient();
 	if (!admin) return [];
 	const { data: latest } = await admin
 		.from("games")
-		.select("season, week, state")
+		.select("season, week, state, kickoff")
 		.order("season", { ascending: false })
 		.order("week", { ascending: true })
 		.limit(400);
-	const rows = (latest ?? []) as Pick<GameRow, "season" | "week" | "state">[];
+	const rows = (latest ?? []) as Pick<
+		GameRow,
+		"season" | "week" | "state" | "kickoff"
+	>[];
 	const season = rows[0]?.season;
 	if (season == null) return [];
 	const inSeason = rows.filter((r) => r.season === season);
+	const now = new Date();
 	const target =
 		week ??
-		inSeason.find((r) => r.state !== "post")?.week ??
+		inSeason.find(
+			(r) =>
+				!weekIsOver(
+					inSeason.filter((g) => g.week === r.week),
+					now,
+				),
+		)?.week ??
 		inSeason.at(-1)?.week;
 	const { data } = await admin
 		.from("games")
