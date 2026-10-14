@@ -1,11 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	useMutation,
+	useQueries,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import { Check, ChevronDown, History } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { pickOutcome, type ScoringMode, scoreWeek } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
 import { toResult } from "#/lib/week-results";
-import { guessMember, parseWeekPaste } from "#/lib/yahoo-import";
+import { guessMember, matchupCheck, parseWeekPaste } from "#/lib/yahoo-import";
 import { weekGamesQuery } from "#/server/games";
 import {
 	importWeekPicks,
@@ -112,6 +117,32 @@ function Importer({ league, members }: { league: League; members: Member[] }) {
 			),
 		[text, games, league.mode],
 	);
+	// A table copied from another week lists matchups this week doesn't have.
+	const wrongWeek = useMemo(() => {
+		const check = matchupCheck(
+			text,
+			games.map((g) => ({ home: g.home.abbr, away: g.away.abbr })),
+		);
+		return check != null && check.unmatched > 0;
+	}, [text, games]);
+	const otherWeeks = useQueries({
+		queries: Array.from({ length: lastWeek }, (_, i) => ({
+			...weekGamesQuery(i + 1),
+			refetchInterval: false as const,
+			staleTime: 5 * 60_000,
+			enabled: wrongWeek,
+		})),
+	});
+	const matchingWeek = wrongWeek
+		? otherWeeks.find(
+				(q) =>
+					q.data?.length &&
+					matchupCheck(
+						text,
+						q.data.map((g) => ({ home: g.home.abbr, away: g.away.abbr })),
+					)?.unmatched === 0,
+			)?.data?.[0]?.week
+		: undefined;
 	const remembered = useMemo(() => savedNames(league.id), [league.id]);
 	const results = useMemo(() => games.map(toResult), [games]);
 	const settings = {
@@ -129,13 +160,19 @@ function Importer({ league, members }: { league: League; members: Member[] }) {
 	const assigned = rows.map((r) => memberFor(r.name));
 	const taken = new Map<string, number>();
 	for (const id of assigned) if (id) taken.set(id, (taken.get(id) ?? 0) + 1);
-	const ready = rows.filter(
-		(r, i) =>
-			assigned[i] && !r.problems.length && taken.get(assigned[i] ?? "") === 1,
-	);
+	const ready = wrongWeek
+		? []
+		: rows.filter(
+				(r, i) =>
+					assigned[i] &&
+					!r.problems.length &&
+					taken.get(assigned[i] ?? "") === 1,
+			);
 
 	const existing = (userId: string) =>
-		(weekData.data?.picks ?? []).filter((p) => p.user_id === userId).length;
+		(weekData.data?.picks ?? []).filter(
+			(p) => p.user_id === userId && !p.imported,
+		).length;
 
 	const save = useMutation({
 		mutationFn: () =>
@@ -221,6 +258,31 @@ function Importer({ league, members }: { league: League; members: Member[] }) {
 				<p className="mt-2 text-muted-foreground">
 					Week {week} isn't over yet. Only finished weeks can be imported.
 				</p>
+			) : wrongWeek ? (
+				<div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-loss">
+					<span>
+						This table is from a different week than Week {week}.
+						{matchingWeek == null &&
+							otherWeeks.some((q) => q.isPending) &&
+							" Finding the right one…"}
+						{matchingWeek == null &&
+							!otherWeeks.some((q) => q.isPending) &&
+							" Pick the week that's open on Yahoo."}
+					</span>
+					{matchingWeek != null && (
+						<button
+							type="button"
+							onClick={() => {
+								setWeek(matchingWeek);
+								setDone(null);
+								save.reset();
+							}}
+							className="h-9 rounded-full border px-4 font-semibold text-foreground hover:bg-muted"
+						>
+							Switch to Week {matchingWeek}
+						</button>
+					)}
+				</div>
 			) : text.trim() && !rows.length ? (
 				<p className="mt-2 text-muted-foreground">
 					No Week {week} picks found in that. Check the week, or try one player
@@ -298,10 +360,14 @@ function Importer({ league, members }: { league: League; members: Member[] }) {
 										{points} pts
 									</span>
 									{r.tiebreaker != null && ` · tiebreaker ${r.tiebreaker}`}
-									{had > 0 &&
-										userId &&
-										` · replaces their ${had} ${had === 1 ? "pick" : "picks"} here`}
 								</p>
+								{had > 0 && userId && (
+									<p className="mt-1 text-xs font-semibold text-foreground">
+										Replaces the {had} {had === 1 ? "pick" : "picks"} they made
+										here for Week {week}, Lock of the Week included. Set them to
+										Skip to keep those instead.
+									</p>
+								)}
 								{r.problems.map((msg) => (
 									<p key={msg} className="mt-1 text-xs text-loss">
 										{msg}
