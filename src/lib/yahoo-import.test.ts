@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	guessMember,
 	type ImportGame,
+	matchupCheck,
 	parseWeekPaste,
 	teamFromWord,
 } from "./yahoo-import";
@@ -223,5 +224,33 @@ describe("parseWeekPaste with Yahoo's group picks table", () => {
 			]),
 		].join("\n");
 		expectRows(parseWeekPaste(text, week1, "confidence"));
+	});
+});
+
+describe("a table from a different week", () => {
+	// Another week's table: KC and BUF are both picked, but they play each other here.
+	const text = [
+		"Favored\tKC\tDAL\t",
+		"Underdog\tSF\tNE\t",
+		"Team Name\tPoints",
+		"Nate\tKC",
+		"(2)    BUF",
+		"(1)\t3",
+	].join("\n");
+
+	it("shows the row with a problem instead of finding nothing", () => {
+		const rows = parseWeekPaste(text, games, "confidence");
+		expect(rows).toHaveLength(1);
+		expect(rows[0].name).toBe("Nate");
+		expect(rows[0].problems[0]).toBe(
+			"Has both KC and BUF, who play each other this week. Is this the right week?",
+		);
+	});
+
+	it("notices the matchups don't match the week", () => {
+		expect(matchupCheck(text, games)).toEqual({ listed: 2, unmatched: 2 });
+		const right = "Favored\tKC\tDAL\nUnderdog\tBUF\tWas";
+		expect(matchupCheck(right, games)).toEqual({ listed: 2, unmatched: 0 });
+		expect(matchupCheck("Steven: KC 4", games)).toBeNull();
 	});
 });

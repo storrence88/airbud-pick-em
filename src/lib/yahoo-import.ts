@@ -127,7 +127,14 @@ function continuesRow(line: string) {
 }
 
 // Row labels in Yahoo's group picks table that aren't players.
-const TABLE_LABELS = new Set(["favored", "underdog", "spread", "team name"]);
+const TABLE_LABELS = new Set([
+	"favored",
+	"underdog",
+	"spread",
+	"team name",
+	"player",
+	"points",
+]);
 
 /**
  * The pasted lines, one per player. Yahoo shows each pick as the team over its
@@ -146,9 +153,41 @@ function joinCells(text: string): string[] {
 }
 
 /**
- * Reads pasted text into one row per player for a week's games. Lines naming
- * both teams of a game (Yahoo's header row of matchups) are skipped, as are
- * lines with no teams at all.
+ * How Yahoo's Favored and Underdog rows line up with a week's games: how many
+ * matchups the paste lists and how many of them aren't games that week. A
+ * mismatch means the table is from a different week. Null without those rows.
+ */
+export function matchupCheck(
+	text: string,
+	games: { home: string; away: string }[],
+): { listed: number; unmatched: number } | null {
+	const teamsOn = (label: string) => {
+		const line = joinCells(text).find(
+			(l) => splitName(l)[0].trim().toLowerCase() === label,
+		);
+		if (!line) return null;
+		return tokenize(splitName(line)[1]).flatMap((t) =>
+			t.kind === "team" ? [t.abbr] : [],
+		);
+	};
+	const favored = teamsOn("favored");
+	const underdog = teamsOn("underdog");
+	if (!favored?.length || !underdog?.length) return null;
+	const listed = Math.min(favored.length, underdog.length);
+	let unmatched = 0;
+	for (let i = 0; i < listed; i++) {
+		const pair = [favored[i], underdog[i]];
+		const found = games.some(
+			(g) => pair.includes(g.home) && pair.includes(g.away),
+		);
+		if (!found) unmatched++;
+	}
+	return { listed, unmatched };
+}
+
+/**
+ * Reads pasted text into one row per player for a week's games. Yahoo's label
+ * rows (Favored, Spread, Underdog) and lines with no teams at all are skipped.
  */
 export function parseWeekPaste(
 	text: string,
@@ -171,7 +210,7 @@ export function parseWeekPaste(
 		const picks: ImportPick[] = [];
 		const used = new Set<number>();
 		let tiebreaker: number | null = null;
-		let header = false;
+		const problems: string[] = [];
 		// Points follow each team ("KC 16") unless the line leads with a number ("16 KC").
 		const first = tokens.find((t) => t.kind !== "tiebreaker");
 		const pointsFirst = first?.kind === "number";
@@ -190,9 +229,13 @@ export function parseWeekPaste(
 			const game = gameOf.get(t.abbr);
 			// A team that isn't playing this week is most likely a stray word.
 			if (!game) continue;
-			if (picks.some((p) => p.gameId === game.id)) {
-				header = true;
-				break;
+			const twice = picks.find((p) => p.gameId === game.id);
+			if (twice) {
+				// Usually a table from another week: these two play each other this week.
+				problems.push(
+					`Has both ${twice.team} and ${t.abbr}, who play each other this week. Is this the right week?`,
+				);
+				continue;
 			}
 			let confidence: number | null = null;
 			const next = tokens[i + 1];
@@ -209,10 +252,9 @@ export function parseWeekPaste(
 			}
 			picks.push({ gameId: game.id, team: t.abbr, confidence });
 		}
-		if (header || !picks.length) continue;
+		if (!picks.length) continue;
 
 		const name = rawName.trim().replace(/\s+/g, " ");
-		const problems: string[] = [];
 		if (!name)
 			problems.push("Couldn't find a name. Put it first, followed by a colon.");
 

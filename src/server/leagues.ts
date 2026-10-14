@@ -43,6 +43,8 @@ export interface PickRow {
 	tiebreaker: number | null;
 	/** The commissioner who entered this pick for the member, if they didn't. */
 	entered_by: string | null;
+	/** Brought over from Yahoo Pick'em by the commissioner (migration 0027). */
+	imported?: boolean;
 }
 
 export interface TrashTalk {
@@ -51,7 +53,7 @@ export interface TrashTalk {
 }
 
 const PICK_COLUMNS =
-	"user_id, game_id, team, confidence, is_lock, tiebreaker, entered_by";
+	"user_id, game_id, team, confidence, is_lock, tiebreaker, entered_by, imported";
 
 async function requireUser() {
 	const sb = getSupabaseServerClient();
