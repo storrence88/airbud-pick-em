@@ -113,8 +113,6 @@ export function GameCard({
 				locked
 					? "bg-card/40 bg-[repeating-linear-gradient(135deg,transparent_0_9px,color-mix(in_oklab,var(--foreground)_7%,transparent)_9px_11px)]"
 					: "bg-card shadow-sm",
-				result === "win" && "border-win/45",
-				result === "loss" && "border-loss/45",
 			)}
 		>
 			<div className="flex items-center justify-between px-4 pt-3 text-xs text-muted-foreground">
@@ -419,11 +417,7 @@ function TeamButton({
 			className={cn(
 				"relative flex flex-col items-start gap-2 overflow-hidden rounded-md border-2 p-3 text-left transition-colors sm:flex-row sm:items-center sm:gap-3",
 				selected
-					? result === "win"
-						? "border-win text-white"
-						: result === "loss"
-							? "border-loss text-white"
-							: "border-transparent text-white"
+					? "border-transparent text-white"
 					: disabled
 						? "border-border/60"
 						: "border-border hover:border-muted-foreground/40",

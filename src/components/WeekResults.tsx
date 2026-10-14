@@ -264,11 +264,8 @@ function PickCell({
 				title={`${name}: ${team.abbr}${cell.isLock ? " (lock)" : ""} · ${OUTCOME_LABEL[cell.outcome]}`}
 				className={cn(
 					"relative flex h-9 items-center justify-center gap-1 rounded-md px-1.5 font-display text-sm font-semibold",
-					// Same language as the game cards: green won, red lost, gray push.
-					cell.outcome === "win" &&
-						"bg-win/15 text-win ring-1 ring-win/45 ring-inset",
-					cell.outcome === "loss" &&
-						"bg-loss/10 text-loss ring-1 ring-loss/45 ring-inset",
+					cell.outcome === "win" && "bg-win/15 text-win",
+					cell.outcome === "loss" && "bg-loss/10 text-loss",
 					cell.outcome === "push" && "bg-muted text-muted-foreground",
 					muted && "opacity-60 saturate-50",
 				)}
