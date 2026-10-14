@@ -1,14 +1,50 @@
+import clipUrl from "#/assets/lock-of-the-week.mp3?url";
+
 /**
- * Chain rattle and padlock slam for the Lock of the Week, synthesized with Web
- * Audio so there's no file to fetch. Only ever called from the user's own click,
- * which is what lets browsers start audio.
+ * The Lock of the Week sound: a cell-door lock clip whose ratchet clicks play
+ * at normal speed, then slow down like tape (dropping in pitch as they go)
+ * right before the lock slams, which lands lower and rings out into reverb.
+ * Only ever played from the user's own click, which lets browsers start audio.
  */
 
-/** When the padlock lands, in seconds after the click. Matches the animation. */
-export const SLAM_AT = 0.55;
+/** Where the slam starts in the clip, in seconds. */
+const CLIP_SLAM = 1.195;
+/** Level for the clip; slowing it softens its peaks, so it can stay at full level. */
+const CLIP_GAIN = 1;
+/** Normal speed until here, then the slowdown begins. */
+const SLOW_FROM = 0.5;
+/** How long the slowdown takes. */
+const SLOW_FOR = 0.7;
+/** Final speed, which also sets the pitch: 0.75 is about 5 semitones down. */
+const SLOW_TO = 0.75;
+
+/** Playback speed at `t` seconds: 1, easing smoothly down to SLOW_TO, then held. */
+function rateAt(t: number) {
+	if (t <= SLOW_FROM) return 1;
+	const p = Math.min(1, (t - SLOW_FROM) / SLOW_FOR);
+	const ease = p * p * (3 - 2 * p);
+	return 1 + (SLOW_TO - 1) * ease;
+}
+
+/** How far into playback the slowed-down slam lands. */
+function slamTime() {
+	const dt = 0.001;
+	let pos = 0;
+	let t = 0;
+	while (pos < CLIP_SLAM) {
+		pos += rateAt(t) * dt;
+		t += dt;
+	}
+	return t;
+}
+
+/** When the padlock lands, in seconds after the click. The animation uses it too. */
+export const SLAM_AT = Math.round(slamTime() * 1000) / 1000;
 
 let ctx: AudioContext | null = null;
-let noise: AudioBuffer | null = null;
+let bytes: Promise<ArrayBuffer> | null = null;
+const decoded = new WeakMap<BaseAudioContext, Promise<AudioBuffer>>();
+const halls = new WeakMap<BaseAudioContext, AudioBuffer>();
 
 function audio(): AudioContext | null {
 	if (typeof window === "undefined") return null;
@@ -22,98 +58,127 @@ function audio(): AudioContext | null {
 	return ctx;
 }
 
-function noiseBuffer(ac: AudioContext) {
-	if (noise) return noise;
-	noise = ac.createBuffer(1, ac.sampleRate * 0.2, ac.sampleRate);
-	const data = noise.getChannelData(0);
-	for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-	return noise;
-}
-
-/** One struck piece of metal: inharmonic partials over a short scrape of noise. */
-function hit(
-	ac: AudioContext,
-	out: AudioNode,
-	t: number,
-	freq: number,
-	gain: number,
-	decay: number,
-) {
-	[1, 2.76, 5.4, 8.93].forEach((ratio, i) => {
-		const osc = ac.createOscillator();
-		osc.frequency.value = freq * ratio;
-		const g = ac.createGain();
-		const end = t + decay / (1 + i * 0.6);
-		g.gain.setValueAtTime(0, t);
-		g.gain.linearRampToValueAtTime(gain / (i + 1), t + 0.002);
-		g.gain.exponentialRampToValueAtTime(0.0001, end);
-		osc.connect(g).connect(out);
-		osc.start(t);
-		osc.stop(end + 0.02);
+/** Starts downloading the clip so the first lock plays on time. */
+export function preloadLockSound() {
+	if (typeof window === "undefined" || bytes) return;
+	bytes = fetch(clipUrl).then((r) => {
+		if (!r.ok) throw new Error(`lock sound: ${r.status}`);
+		return r.arrayBuffer();
 	});
-	const src = ac.createBufferSource();
-	src.buffer = noiseBuffer(ac);
-	const hp = ac.createBiquadFilter();
-	hp.type = "highpass";
-	hp.frequency.value = 2500;
-	const g = ac.createGain();
-	g.gain.setValueAtTime(gain * 0.8, t);
-	g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
-	src.connect(hp).connect(g).connect(out);
-	src.start(t);
-	src.stop(t + 0.05);
+	bytes.catch(() => {
+		bytes = null;
+	});
 }
 
-/** Chains rattling in, then the padlock slamming shut with a heavy clink. */
-export function playLockSound(slamAt = SLAM_AT) {
-	const ac = audio();
-	if (!ac) return;
-	const now = ac.currentTime + 0.01;
-	const master = ac.createGain();
-	master.gain.value = 0.55;
-	const comp = ac.createDynamicsCompressor();
-	master.connect(comp).connect(ac.destination);
-
-	// Chain links knocking together as the chains swing in.
-	const links = Math.max(0, Math.floor(slamAt / 0.05));
-	for (let i = 0; i < links; i++) {
-		const t = now + i * 0.05 + Math.random() * 0.02;
-		hit(
-			ac,
-			master,
-			t,
-			1700 + Math.random() * 1500,
-			0.07 + Math.random() * 0.07,
-			0.12,
+function clip(ac: BaseAudioContext) {
+	let buf = decoded.get(ac);
+	if (!buf) {
+		preloadLockSound();
+		// decodeAudioData detaches the bytes it's given, so hand it a copy.
+		buf = (bytes ?? Promise.reject(new Error("lock sound unavailable"))).then(
+			(b) => ac.decodeAudioData(b.slice(0)),
 		);
+		decoded.set(ac, buf);
+		buf.catch(() => decoded.delete(ac));
+	}
+	return buf;
+}
+
+/** A big, dark hall: a low-passed noise tail that fades over a few seconds. */
+function hall(ac: BaseAudioContext) {
+	let buf = halls.get(ac);
+	if (!buf) {
+		const len = Math.floor(ac.sampleRate * 3);
+		buf = ac.createBuffer(2, len, ac.sampleRate);
+		for (let c = 0; c < 2; c++) {
+			const data = buf.getChannelData(c);
+			let lp = 0;
+			for (let i = 0; i < len; i++) {
+				lp += 0.35 * (Math.random() * 2 - 1 - lp);
+				data[i] = lp * (1 - i / len) ** 2.5;
+			}
+		}
+		halls.set(ac, buf);
+	}
+	return buf;
+}
+
+/**
+ * Plays the clip into any audio context from `t0`: normal speed, the
+ * slowdown into the slam, and the reverb swelling as the lock lands.
+ * `reduced` skips ahead to just before the slam, at the slowed speed.
+ */
+export function scheduleLockSound(
+	ac: BaseAudioContext,
+	dest: AudioNode,
+	buffer: AudioBuffer,
+	t0: number,
+	reduced = false,
+) {
+	const src = ac.createBufferSource();
+	src.buffer = buffer;
+
+	const level = ac.createGain();
+	level.gain.value = CLIP_GAIN;
+	const dry = ac.createGain();
+	dry.gain.value = 0.85;
+	const room = ac.createConvolver();
+	room.buffer = hall(ac);
+	const wet = ac.createGain();
+	src.connect(level);
+	level.connect(dry).connect(dest);
+	level.connect(room).connect(wet).connect(dest);
+
+	if (reduced) {
+		src.playbackRate.value = SLOW_TO;
+		wet.gain.value = 0.45;
+		src.start(t0, CLIP_SLAM - 0.03);
+		return;
 	}
 
-	const slam = now + slamAt;
-	// Body thump.
-	const thump = ac.createOscillator();
-	thump.frequency.setValueAtTime(150, slam);
-	thump.frequency.exponentialRampToValueAtTime(45, slam + 0.25);
-	const tg = ac.createGain();
-	tg.gain.setValueAtTime(0.9, slam);
-	tg.gain.exponentialRampToValueAtTime(0.0001, slam + 0.35);
-	thump.connect(tg).connect(master);
-	thump.start(slam);
-	thump.stop(slam + 0.4);
-	// The clank, then the shackle clicking home.
-	hit(ac, master, slam, 520, 0.4, 1.1);
-	hit(ac, master, slam + 0.005, 1240, 0.22, 0.6);
-	hit(ac, master, slam + 0.07, 3300, 0.18, 0.08);
-	// A last chain settle.
-	hit(ac, master, slam + 0.22, 2400, 0.06, 0.15);
-	hit(ac, master, slam + 0.31, 2900, 0.04, 0.12);
+	// The slowdown, sampled finely enough to sound continuous.
+	const steps = 64;
+	const curve = new Float32Array(steps);
+	for (let i = 0; i < steps; i++)
+		curve[i] = rateAt(SLOW_FROM + (SLOW_FOR * i) / (steps - 1));
+	src.playbackRate.setValueAtTime(1, t0);
+	src.playbackRate.setValueCurveAtTime(curve, t0 + SLOW_FROM, SLOW_FOR);
+
+	// A little room throughout, then a big hall as the lock lands.
+	wet.gain.setValueAtTime(0.12, t0);
+	wet.gain.setValueAtTime(0.12, t0 + SLAM_AT - 0.1);
+	wet.gain.linearRampToValueAtTime(0.45, t0 + SLAM_AT + 0.05);
+	src.start(t0);
+}
+
+/** Plays the lock sound now. With `reduced`, just the slam. */
+export function playLockSound(reduced = false) {
+	const ac = audio();
+	if (!ac) return;
+	const clicked = ac.currentTime;
+	clip(ac)
+		.then((buffer) => {
+			// Too slow to arrive (first tap on a bad connection): stay quiet
+			// rather than slam out of step with the animation.
+			if (ac.currentTime - clicked > 0.25) return;
+			const t0 = Math.max(clicked + 0.02, ac.currentTime + 0.005);
+			scheduleLockSound(ac, ac.destination, buffer, t0, reduced);
+		})
+		.catch(() => {});
 }
 
 /** A small click for taking the lock back off. */
 export function playUnlockSound() {
 	const ac = audio();
 	if (!ac) return;
-	const out = ac.createGain();
-	out.gain.value = 0.4;
-	out.connect(ac.destination);
-	hit(ac, out, ac.currentTime + 0.01, 2600, 0.15, 0.08);
+	const t = ac.currentTime + 0.01;
+	const osc = ac.createOscillator();
+	osc.frequency.setValueAtTime(1800, t);
+	osc.frequency.exponentialRampToValueAtTime(900, t + 0.05);
+	const g = ac.createGain();
+	g.gain.setValueAtTime(0.2, t);
+	g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+	osc.connect(g).connect(ac.destination);
+	osc.start(t);
+	osc.stop(t + 0.08);
 }
