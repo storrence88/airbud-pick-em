@@ -1,11 +1,11 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { playLockSound, SLAM_AT } from "#/lib/lock-sound";
+import { CHAIN_HITS, playLockSound, SLAM_AT } from "#/lib/lock-sound";
 import type { Team } from "#/lib/nfl/types";
 
 /** Full run, from the chains swinging in to the overlay clearing. */
-const DURATION = 2.6;
+const DURATION = SLAM_AT + 2.2;
 const REDUCED_DURATION = 1.2;
 
 /**
@@ -31,8 +31,10 @@ export function useLockCelebration() {
 }
 
 /**
- * Chains whip in from both sides, a giant gold padlock with your team's logo
- * slams down between them, the shackle snaps shut, and the screen shakes.
+ * Two pairs of chains crash in, the screen rumbles harder and harder while a
+ * giant gold padlock with your team's logo hangs overhead, then it slams down
+ * like a bomb: shackle snaps shut, fireball, flash, shockwaves, sparks and a
+ * big screen shake.
  * A tap or Escape clears it early.
  */
 export function LockCelebration({
@@ -84,13 +86,25 @@ export function LockCelebration({
 						"radial-gradient(circle at 50% 45%, rgb(251 191 36 / 0.45), rgb(251 191 36 / 0.08) 35%, transparent 65%)",
 				}}
 				initial={{ opacity: 0 }}
-				animate={{ opacity: 1 }}
-				transition={{ delay: slam, duration: 0.3 }}
+				animate={reduce ? { opacity: 1 } : { opacity: [0, 0.35, 1] }}
+				transition={
+					reduce
+						? { duration: 0.3 }
+						: { delay: 0.6, duration: slam - 0.6, times: [0, 0.9, 1] }
+				}
 			/>
 
 			{!reduce && <Rays slam={slam} />}
 
-			<div className="relative flex flex-col items-center gap-10 sm:gap-12">
+			<motion.div
+				className="relative flex flex-col items-center gap-10 sm:gap-12"
+				animate={reduce ? undefined : rumble}
+				transition={{
+					delay: CHAIN_HITS[1],
+					duration: slam - CHAIN_HITS[1],
+					ease: "linear",
+				}}
+			>
 				<motion.div
 					aria-hidden
 					className="relative grid place-items-center"
@@ -98,16 +112,19 @@ export function LockCelebration({
 						reduce
 							? undefined
 							: {
-									x: [0, -16, 14, -10, 8, -4, 2, 0],
-									y: [0, 10, -8, 6, -4, 2, 0, 0],
+									x: [0, -34, 30, -24, 18, -12, 8, -4, 0],
+									y: [0, 26, -20, 14, -10, 6, -3, 1, 0],
 								}
 					}
-					transition={{ delay: slam, duration: 0.45 }}
+					transition={{ delay: slam, duration: 0.75 }}
 				>
 					{!reduce && (
 						<>
-							<Chain angle={28} from={-1} />
-							<Chain angle={-28} from={1} />
+							<Chain angle={28} from={-1} at={CHAIN_HITS[0]} />
+							<Chain angle={-28} from={1} at={CHAIN_HITS[0]} />
+							<Chain angle={64} from={1} at={CHAIN_HITS[1]} />
+							<Chain angle={-64} from={-1} at={CHAIN_HITS[1]} />
+							<Fireball slam={slam} />
 							<Rings slam={slam} />
 							<Sparks slam={slam} />
 						</>
@@ -165,7 +182,7 @@ export function LockCelebration({
 						{team.shortName} · locked in
 					</motion.p>
 				</div>
-			</div>
+			</motion.div>
 
 			{/* White-hot flash on impact. */}
 			{!reduce && (
@@ -173,8 +190,12 @@ export function LockCelebration({
 					aria-hidden
 					className="pointer-events-none absolute inset-0 bg-amber-50"
 					initial={{ opacity: 0 }}
-					animate={{ opacity: [0, 0.75, 0] }}
-					transition={{ delay: slam, duration: 0.35, times: [0, 0.15, 1] }}
+					animate={{ opacity: [0, 0.95, 0.5, 0] }}
+					transition={{
+						delay: slam,
+						duration: 0.6,
+						times: [0, 0.08, 0.3, 1],
+					}}
 				/>
 			)}
 		</motion.div>,
@@ -198,27 +219,54 @@ function Padlock({
 			initial={
 				reduce
 					? { opacity: 0, scale: 0.9 }
-					: { y: "-70vh", scale: 1.8, rotate: -14 }
+					: { y: "-95vh", scale: 1.8, rotate: -14 }
 			}
 			animate={
 				reduce
 					? { opacity: 1, scale: 1 }
 					: {
-							y: ["-70vh", "0vh", "0vh", "0vh", "0vh"],
-							scale: [1.8, 1, 1, 1, 1],
-							scaleY: [1, 1, 0.82, 1.06, 1],
-							scaleX: [1, 1, 1.12, 0.97, 1],
-							rotate: [-14, 0, 0, 0, 0],
+							// Swing into view overhead, hang there swaying while the
+							// tension builds, then drop like a bomb.
+							y: [
+								"-95vh",
+								"-12vh",
+								"-14vh",
+								"-17vh",
+								"0vh",
+								"0vh",
+								"0vh",
+								"0vh",
+							],
+							scale: [1.8, 1.15, 1.22, 1.3, 1, 1, 1, 1],
+							scaleY: [1, 1, 1, 1, 1, 0.74, 1.08, 1],
+							scaleX: [1, 1, 1, 1, 1, 1.2, 0.96, 1],
+							rotate: [-14, -6, 5, -3, 0, 0, 0, 0],
 						}
 			}
 			transition={
 				reduce
 					? { duration: 0.25 }
 					: {
-							delay: 0.2,
-							duration: slam - 0.2 + 0.35,
-							times: [0, 0.5, 0.62, 0.82, 1],
-							ease: ["easeIn", "easeOut", "easeOut", "easeOut"],
+							duration: slam + 0.4,
+							times: [
+								0,
+								0.6 / (slam + 0.4),
+								(slam - 0.55) / (slam + 0.4),
+								(slam - 0.22) / (slam + 0.4),
+								slam / (slam + 0.4),
+								(slam + 0.08) / (slam + 0.4),
+								(slam + 0.22) / (slam + 0.4),
+								1,
+							],
+							ease: [
+								"easeOut",
+								"easeInOut",
+								"easeInOut",
+								"easeIn",
+								"easeOut",
+								"easeOut",
+								"easeOut",
+							],
 						}
 			}
 		>
@@ -336,32 +384,50 @@ function Padlock({
 /** A strip of steel chain, rendered as a repeating SVG tile. */
 const CHAIN_TILE = `url("data:image/svg+xml,${encodeURIComponent(
 	`<svg xmlns='http://www.w3.org/2000/svg' width='48' height='28' viewBox='0 0 48 28'>
-		<ellipse cx='14' cy='14' rx='12' ry='9' fill='none' stroke='#334155' stroke-width='7'/>
-		<ellipse cx='14' cy='14' rx='12' ry='9' fill='none' stroke='#cbd5e1' stroke-width='3.5'/>
-		<rect x='22' y='10.5' width='26' height='7' rx='3.5' fill='#475569'/>
-		<rect x='22' y='11.5' width='26' height='3' rx='1.5' fill='#e2e8f0'/>
+		<ellipse cx='14' cy='14' rx='11.5' ry='9.5' fill='none' stroke='#1e293b' stroke-width='9'/>
+		<ellipse cx='14' cy='14' rx='11.5' ry='9.5' fill='none' stroke='#94a3b8' stroke-width='5.5'/>
+		<ellipse cx='13' cy='12.5' rx='11' ry='8.5' fill='none' stroke='#f1f5f9' stroke-width='1.8'/>
+		<rect x='21' y='9' width='28' height='10' rx='5' fill='#1e293b'/>
+		<rect x='21' y='10.5' width='28' height='6' rx='3' fill='#94a3b8'/>
+		<rect x='21' y='11' width='28' height='2' rx='1' fill='#f1f5f9'/>
 	</svg>`,
 )}")`;
 
-function Chain({ angle, from }: { angle: number; from: -1 | 1 }) {
+/** Screen rumble that grows from a tremor to a violent shake before the slam. */
+const rumble = {
+	x: Array.from({ length: 24 }, (_, i) => (i % 2 ? 1 : -1) * (1 + i * 0.35)),
+	y: Array.from({ length: 24 }, (_, i) => (i % 3 ? 1 : -1) * (0.5 + i * 0.25)),
+};
+
+/** A thick steel chain that whips in and crashes into place at `at` seconds. */
+function Chain({
+	angle,
+	from,
+	at,
+}: {
+	angle: number;
+	from: -1 | 1;
+	at: number;
+}) {
 	return (
 		<motion.div
-			className="pointer-events-none absolute h-9 w-[220vmax]"
+			className="pointer-events-none absolute h-12 w-[220vmax] sm:h-14"
 			style={{
 				backgroundImage: CHAIN_TILE,
 				backgroundSize: "auto 100%",
 				backgroundRepeat: "repeat-x",
 				rotate: angle,
-				filter: "drop-shadow(0 6px 8px rgb(0 0 0 / 0.6))",
+				filter: "drop-shadow(0 8px 10px rgb(0 0 0 / 0.7))",
 			}}
 			initial={{ x: `${from * 140}vmax` }}
 			animate={{
-				x: [`${from * 140}vmax`, "0vmax", `${-from * 1.5}vmax`, "0vmax"],
+				x: [`${from * 140}vmax`, "0vmax", `${-from * 2}vmax`, "0vmax"],
 			}}
 			transition={{
-				duration: 0.75,
+				delay: at - 0.3,
+				duration: 0.55,
 				times: [0, 0.55, 0.75, 1],
-				ease: "easeOut",
+				ease: ["easeIn", "easeOut", "easeOut"],
 			}}
 		/>
 	);
@@ -370,14 +436,14 @@ function Chain({ angle, from }: { angle: number; from: -1 | 1 }) {
 function Rings({ slam }: { slam: number }) {
 	return (
 		<>
-			{[0, 0.08, 0.18].map((d) => (
+			{[0, 0.06, 0.14, 0.24, 0.36].map((d) => (
 				<motion.span
 					key={d}
 					className="pointer-events-none absolute size-40 rounded-full border-4 border-amber-300"
 					style={{ boxShadow: "0 0 30px rgb(251 191 36 / 0.8)" }}
 					initial={{ scale: 0.3, opacity: 0 }}
-					animate={{ scale: 4, opacity: [0, 0.95, 0] }}
-					transition={{ delay: slam + d, duration: 0.75, ease: "easeOut" }}
+					animate={{ scale: 6, opacity: [0, 0.95, 0] }}
+					transition={{ delay: slam + d, duration: 0.9, ease: "easeOut" }}
 				/>
 			))}
 		</>
@@ -387,15 +453,15 @@ function Rings({ slam }: { slam: number }) {
 function Sparks({ slam }: { slam: number }) {
 	const sparks = useMemo(
 		() =>
-			Array.from({ length: 36 }, (_, i) => {
-				const angle = (i / 36) * Math.PI * 2 + Math.random() * 0.3;
-				const dist = 140 + Math.random() * 260;
+			Array.from({ length: 72 }, (_, i) => {
+				const angle = (i / 72) * Math.PI * 2 + Math.random() * 0.3;
+				const dist = 160 + Math.random() * 480;
 				return {
 					x: Math.cos(angle) * dist,
 					y: Math.sin(angle) * dist,
 					rotate: (angle * 180) / Math.PI,
 					color: i % 3 === 0 ? "#fff7d6" : i % 3 === 1 ? "#fbbf24" : "#f59e0b",
-					len: 10 + Math.random() * 16,
+					len: 12 + Math.random() * 26,
 				};
 			}),
 		[],
@@ -420,10 +486,33 @@ function Sparks({ slam }: { slam: number }) {
 						opacity: [0, 1, 0],
 						scaleX: [1.4, 0.3],
 					}}
-					transition={{ delay: slam, duration: 0.9, ease: "easeOut" }}
+					transition={{ delay: slam, duration: 1.1, ease: "easeOut" }}
 				/>
 			))}
 		</>
+	);
+}
+
+/** The blast: a white-hot core blooming into an orange fireball. */
+function Fireball({ slam }: { slam: number }) {
+	return (
+		<motion.span
+			aria-hidden
+			className="pointer-events-none absolute size-48 rounded-full"
+			style={{
+				background:
+					"radial-gradient(circle, #fffbeb 0%, #fde68a 22%, #f59e0b 45%, rgb(234 88 12 / 0.7) 62%, transparent 72%)",
+				filter: "blur(4px)",
+			}}
+			initial={{ scale: 0, opacity: 0 }}
+			animate={{ scale: [0, 3.2, 5], opacity: [0, 1, 0] }}
+			transition={{
+				delay: slam,
+				duration: 0.8,
+				times: [0, 0.3, 1],
+				ease: "easeOut",
+			}}
+		/>
 	);
 }
 
