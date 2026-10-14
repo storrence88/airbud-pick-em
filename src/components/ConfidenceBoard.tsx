@@ -5,7 +5,13 @@ import {
 	Reorder,
 	useDragControls,
 } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+	type PointerEvent as ReactPointerEvent,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import {
 	type ConfidenceChange,
 	forfeited,
@@ -29,10 +35,70 @@ interface Props {
 
 const spring = { type: "spring", stiffness: 500, damping: 40 } as const;
 
+/** How long a finger rests on a row before it lifts for dragging. */
+const HOLD_MS = 220;
+/** A finger that travels this far before the hold fires is scrolling. */
+const SCROLL_SLOP = 8;
+
 /**
- * The user's picks ranked by confidence, most sure on top. Dragging (or the
- * arrows) reorders the games while the point values stay in their slots, so a
- * value can never be given to two games.
+ * Starts a row drag from anywhere on the row. A mouse or pen drags right away;
+ * a finger has to rest briefly first so swiping over the list still scrolls.
+ */
+function useRowDrag(start: (e: PointerEvent) => void) {
+	const [held, setHeld] = useState(false);
+	const cleanup = useRef<() => void>(undefined);
+	useEffect(() => () => cleanup.current?.(), []);
+
+	function onPointerDown(e: ReactPointerEvent) {
+		if (e.button !== 0) return;
+		cleanup.current?.();
+		if (e.pointerType !== "touch") {
+			start(e.nativeEvent);
+			return;
+		}
+		const down = e.nativeEvent;
+		let lifted = false;
+		const timer = window.setTimeout(() => {
+			lifted = true;
+			setHeld(true);
+			navigator.vibrate?.(8);
+			start(down);
+		}, HOLD_MS);
+		const onMove = (m: PointerEvent) => {
+			if (m.pointerId !== down.pointerId || lifted) return;
+			if (
+				Math.hypot(m.clientX - down.clientX, m.clientY - down.clientY) >
+				SCROLL_SLOP
+			)
+				done();
+		};
+		// Once lifted, keep the page from scrolling under the dragged row.
+		const noScroll = (t: TouchEvent) => {
+			if (lifted) t.preventDefault();
+		};
+		const done = () => {
+			window.clearTimeout(timer);
+			window.removeEventListener("pointermove", onMove);
+			window.removeEventListener("pointerup", done);
+			window.removeEventListener("pointercancel", done);
+			window.removeEventListener("touchmove", noScroll);
+			cleanup.current = undefined;
+			setHeld(false);
+		};
+		window.addEventListener("pointermove", onMove);
+		window.addEventListener("pointerup", done);
+		window.addEventListener("pointercancel", done);
+		window.addEventListener("touchmove", noScroll, { passive: false });
+		cleanup.current = done;
+	}
+
+	return { held, onPointerDown };
+}
+
+/**
+ * The user's picks ranked by confidence, most sure on top. Dragging a row from
+ * anywhere (or the arrows) reorders the games while the point values stay in
+ * their slots, so a value can never be given to two games.
  */
 export function ConfidenceBoard({
 	games,
@@ -228,6 +294,7 @@ function Row({
 	onMove: (delta: -1 | 1) => void;
 }) {
 	const controls = useDragControls();
+	const { held, onPointerDown } = useRowDrag((e) => controls.start(e));
 	const picked = team === game.home.abbr ? game.home : game.away;
 	// Higher values glow brighter.
 	const strength = max > 1 ? (value - 1) / (max - 1) : 1;
@@ -245,16 +312,20 @@ function Row({
 				boxShadow: "0 12px 32px -8px rgb(0 0 0 / 0.35)",
 				zIndex: 10,
 			}}
-			className="relative flex items-center gap-2 rounded-md border bg-background py-1.5 pr-1.5 pl-1"
+			onPointerDown={onPointerDown}
+			onContextMenu={(e) => e.preventDefault()}
+			className={cn(
+				"relative flex cursor-grab items-center gap-2 rounded-md border bg-background py-1.5 pr-1.5 pl-1 select-none [-webkit-touch-callout:none] active:cursor-grabbing transition-[scale,box-shadow]",
+				held && "scale-[1.02] shadow-lg ring-2 ring-primary/40",
+			)}
 		>
-			<button
-				type="button"
-				aria-label={`Drag ${picked.shortName} to rerank`}
-				onPointerDown={(e) => controls.start(e)}
-				className="grid h-11 w-8 shrink-0 cursor-grab touch-none place-items-center rounded text-muted-foreground hover:text-foreground active:cursor-grabbing"
+			{/* The whole row drags; the grip just says so. */}
+			<span
+				aria-hidden
+				className="grid h-11 w-6 shrink-0 place-items-center text-muted-foreground"
 			>
 				<GripVertical className="size-4" />
-			</button>
+			</span>
 			<motion.span
 				key={value}
 				initial={{ scale: 0.6, opacity: 0 }}
@@ -269,11 +340,19 @@ function Row({
 				{value}
 			</motion.span>
 			{picked.logo && (
-				<img src={picked.logo} alt="" className="size-8 shrink-0" />
+				<img
+					src={picked.logo}
+					alt=""
+					draggable={false}
+					className="size-8 shrink-0"
+				/>
 			)}
 			<Matchup game={game} team={team} />
 			{/* Side by side and thumb-sized on phones, stacked and compact on wider screens. */}
-			<div className="ml-auto flex shrink-0 sm:flex-col">
+			<div
+				className="ml-auto flex shrink-0 cursor-auto sm:flex-col"
+				onPointerDown={(e) => e.stopPropagation()}
+			>
 				<button
 					type="button"
 					aria-label={`Move ${picked.shortName} up`}
