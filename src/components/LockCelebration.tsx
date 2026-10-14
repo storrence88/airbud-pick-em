@@ -1,11 +1,13 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CHAIN_HITS, playLockSound, SLAM_AT } from "#/lib/lock-sound";
+import { playLockSound, preloadLockSound, SLAM_AT } from "#/lib/lock-sound";
 import type { Team } from "#/lib/nfl/types";
 
 /** Full run, from the chains swinging in to the overlay clearing. */
 const DURATION = SLAM_AT + 2.2;
+/** When each pair of chains crashes into place during the buildup. */
+const CHAIN_HITS = [0.45, 0.8];
 const REDUCED_DURATION = 1.2;
 
 /**
@@ -15,9 +17,10 @@ const REDUCED_DURATION = 1.2;
 export function useLockCelebration() {
 	const reduce = useReducedMotion();
 	const [shown, setShown] = useState<{ team: Team; n: number } | null>(null);
+	useEffect(preloadLockSound, []);
 	return {
 		celebrate(team: Team) {
-			playLockSound(reduce ? 0 : SLAM_AT);
+			playLockSound(!!reduce);
 			setShown((s) => ({ team, n: (s?.n ?? 0) + 1 }));
 		},
 		node: shown && (
