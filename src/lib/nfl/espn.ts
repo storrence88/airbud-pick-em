@@ -1,4 +1,5 @@
 import type { Game, GameState, NflProvider, Team } from "./types";
+import { weekIsOver } from "./week";
 
 const SCOREBOARD =
 	"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
@@ -146,8 +147,20 @@ async function fetchScoreboard(opts: { season?: number; week?: number }) {
 export const espnProvider: NflProvider = {
 	async getWeek({ season, week } = {}) {
 		const data = await fetchScoreboard({ season, week });
-		const standIn = week ? null : regularSeasonStandIn(data);
-		if (!standIn) return parseScoreboard(data);
+		if (week) return parseScoreboard(data);
+		const standIn = regularSeasonStandIn(data);
+		if (!standIn) {
+			// ESPN's current week only flips on Wednesday; move on sooner.
+			const games = parseScoreboard(data);
+			if (!weekIsOver(games, new Date())) return games;
+			const next = parseScoreboard(
+				await fetchScoreboard({
+					season: games[0].season,
+					week: games[0].week + 1,
+				}),
+			);
+			return next.length > 0 ? next : games;
+		}
 		const games = parseScoreboard(await fetchScoreboard(standIn));
 		// In the offseason ESPN may already be on next year; fall back a season.
 		if (games.length > 0 || season) return games;
