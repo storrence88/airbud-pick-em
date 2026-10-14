@@ -47,11 +47,16 @@ import { enteredNote } from "#/lib/entered";
 import { fadedThePublic } from "#/lib/faded";
 import type { Game } from "#/lib/nfl/types";
 import { isVeteran, readOnboarding, updateOnboarding } from "#/lib/onboarding";
-import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
+import {
+	pickOutcome,
+	SCORING_MODES,
+	type ScoringMode,
+	scorePick,
+} from "#/lib/scoring";
 import { shareCard } from "#/lib/share-card";
 import { tiebreakerGameId } from "#/lib/tiebreaker";
 import { cn } from "#/lib/utils";
-import { weekResults } from "#/lib/week-results";
+import { toResult, weekResults } from "#/lib/week-results";
 import {
 	leagueWeekQuery,
 	type PickRow,
@@ -630,10 +635,29 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 							data.picks,
 							league.mode,
 						);
+						const myResult = myPick && {
+							pick: {
+								gameId: g.id,
+								team: myPick.team,
+								confidence: myPick.confidence,
+							},
+							game: toResult(g),
+						};
 						return (
 							<GameCard
 								key={g.id}
 								game={g}
+								outcome={
+									myResult &&
+									pickOutcome(myResult.pick, myResult.game, league.mode)
+								}
+								points={
+									myResult &&
+									scorePick(myResult.pick, myResult.game, {
+										mode: league.mode,
+										pushValue: league.settings.pushValue,
+									})
+								}
 								faded={
 									fade && {
 										crowd: fade.crowd,

@@ -1,7 +1,17 @@
-import { Check, Info, Lock, PencilLine, Sparkles, Star } from "lucide-react";
+import {
+	Check,
+	Equal,
+	Info,
+	Lock,
+	PencilLine,
+	Sparkles,
+	Star,
+	X,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useState } from "react";
 import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
+import type { PickOutcome } from "#/lib/scoring";
 import { accentColors, splitColors } from "#/lib/team-colors";
 import { useResolvedTheme } from "#/lib/theme";
 import { cn } from "#/lib/utils";
@@ -33,6 +43,9 @@ interface Props {
 	details?: boolean;
 	/** Point out the details button to players who haven't tried it yet. */
 	newDetails?: boolean;
+	/** How your pick went under the league's scoring, and what it earned. */
+	outcome?: PickOutcome | null;
+	points?: number | null;
 }
 
 function formatKickoff(iso: string) {
@@ -58,15 +71,19 @@ export function GameCard({
 	lockedSpread,
 	details: hasDetails = true,
 	newDetails = false,
+	outcome,
+	points,
 }: Props) {
 	const [details, setDetails] = useState(false);
 	const detailsDot = useNewDot("game-details", hasDetails && newDetails);
 	const line = lineText === undefined ? game.spreadText : lineText;
 	const locked = game.state !== "pre";
-	// Once a game is final the losing side fades back so the result reads at a glance.
+	// Once a game is final the side that lost fades back, unless it's your
+	// pick: that one keeps its color and wears its result instead.
 	const final = game.state === "post";
 	const awayLost = final && game.awayScore < game.homeScore;
 	const homeLost = final && game.homeScore < game.awayScore;
+	const result = final && outcome && outcome !== "pending" ? outcome : null;
 	const pickedTeam =
 		picked === game.home.abbr
 			? game.home
@@ -96,6 +113,8 @@ export function GameCard({
 				locked
 					? "bg-card/40 bg-[repeating-linear-gradient(135deg,transparent_0_9px,color-mix(in_oklab,var(--foreground)_7%,transparent)_9px_11px)]"
 					: "bg-card shadow-sm",
+				result === "win" && "border-win/45",
+				result === "loss" && "border-loss/45",
 			)}
 		>
 			<div className="flex items-center justify-between px-4 pt-3 text-xs text-muted-foreground">
@@ -133,7 +152,13 @@ export function GameCard({
 					showScore={game.state !== "pre"}
 					selected={picked === game.away.abbr}
 					disabled={locked}
-					faded={awayLost || (game.state === "in" && picked !== game.away.abbr)}
+					lostGame={awayLost}
+					result={
+						picked !== game.away.abbr
+							? null
+							: (result ?? (locked ? "pending" : null))
+					}
+					points={points}
 					onClick={() => onPick(game.away.abbr)}
 					label="Away"
 				/>
@@ -143,7 +168,13 @@ export function GameCard({
 					showScore={game.state !== "pre"}
 					selected={picked === game.home.abbr}
 					disabled={locked}
-					faded={homeLost || (game.state === "in" && picked !== game.home.abbr)}
+					lostGame={homeLost}
+					result={
+						picked !== game.home.abbr
+							? null
+							: (result ?? (locked ? "pending" : null))
+					}
+					points={points}
 					onClick={() => onPick(game.home.abbr)}
 					label="Home"
 				/>
@@ -343,13 +374,22 @@ export function PublicPicksNote({ games }: { games: Game[] }) {
 	);
 }
 
+const RESULT_TEXT: Record<PickOutcome, string> = {
+	pending: "Your pick",
+	win: "Won",
+	loss: "Lost",
+	push: "Push",
+};
+
 function TeamButton({
 	team,
 	score,
 	showScore,
 	selected,
 	disabled,
-	faded,
+	lostGame,
+	result,
+	points,
 	onClick,
 	label,
 }: {
@@ -358,10 +398,16 @@ function TeamButton({
 	showScore: boolean;
 	selected: boolean;
 	disabled: boolean;
-	faded: boolean;
+	/** This team lost the game outright (final only). */
+	lostGame: boolean;
+	/** Set on your pick once picks lock: still going, or how it went. */
+	result: PickOutcome | null;
+	points?: number | null;
 	onClick: () => void;
 	label: string;
 }) {
+	const earned =
+		(result === "win" || result === "push") && points ? ` · +${points}` : "";
 	return (
 		<motion.button
 			type="button"
@@ -373,12 +419,17 @@ function TeamButton({
 			className={cn(
 				"relative flex flex-col items-start gap-2 overflow-hidden rounded-md border-2 p-3 text-left transition-colors sm:flex-row sm:items-center sm:gap-3",
 				selected
-					? "border-transparent text-white"
+					? result === "win"
+						? "border-win text-white"
+						: result === "loss"
+							? "border-loss text-white"
+							: "border-transparent text-white"
 					: disabled
 						? "border-border/60"
 						: "border-border hover:border-muted-foreground/40",
 				disabled && "cursor-default",
-				faded && "opacity-45 saturate-[.35]",
+				// The team you didn't pick that lost steps back; your pick never does.
+				!selected && lostGame && "opacity-50 saturate-50",
 			)}
 		>
 			<AnimatePresence>
@@ -404,22 +455,40 @@ function TeamButton({
 							alt=""
 							className="size-9 drop-shadow sm:size-10"
 						/>
-						<CheckBadge
+						<ResultBadge
 							show={selected}
+							result={result}
 							className="absolute -right-2 -bottom-1.5 size-5 sm:hidden"
 						/>
 					</span>
 				)}
 				{showScore && (
-					<span className="relative font-display text-2xl font-bold tabular-nums sm:order-last">
+					<span
+						className={cn(
+							"relative font-display text-2xl font-bold tabular-nums sm:order-last",
+							selected && lostGame && "opacity-60",
+						)}
+					>
 						{score}
 					</span>
 				)}
 			</span>
 			<span className="relative w-full min-w-0 flex-1 sm:w-auto">
-				<span className="block text-[10px] uppercase tracking-wider opacity-70">
-					{label}
-				</span>
+				{selected && result ? (
+					<span
+						className={cn(
+							"block text-[10px] font-semibold uppercase tracking-wider",
+							result === "pending" && "opacity-80",
+						)}
+					>
+						{RESULT_TEXT[result]}
+						{earned}
+					</span>
+				) : (
+					<span className="block text-[10px] uppercase tracking-wider opacity-70">
+						{label}
+					</span>
+				)}
 				<span className="block truncate font-display text-lg font-semibold leading-tight">
 					{team.shortName}
 				</span>
@@ -427,8 +496,9 @@ function TeamButton({
 					<span className="block text-xs opacity-70">{team.record}</span>
 				)}
 			</span>
-			<CheckBadge
+			<ResultBadge
 				show={selected}
+				result={result}
 				className={cn(
 					"size-6 sm:order-last",
 					team.logo ? "hidden sm:grid" : "absolute top-2 right-2 sm:static",
@@ -438,26 +508,40 @@ function TeamButton({
 	);
 }
 
-function CheckBadge({
+/** A white check on your pick; once final, a green check, red X or gray equals. */
+function ResultBadge({
 	show,
+	result,
 	className,
 }: {
 	show: boolean;
+	result: PickOutcome | null;
 	className?: string;
 }) {
+	const settled = result && result !== "pending" ? result : null;
+	const Icon = settled === "loss" ? X : settled === "push" ? Equal : Check;
 	return (
 		<AnimatePresence>
 			{show && (
 				<motion.span
+					key={settled ?? "pick"}
 					initial={{ scale: 0, rotate: -45 }}
 					animate={{ scale: 1, rotate: 0 }}
 					exit={{ scale: 0 }}
 					className={cn(
-						"relative grid place-items-center rounded-full bg-white/90 text-black shadow",
+						"relative grid place-items-center rounded-full shadow",
+						settled === "win"
+							? "bg-win text-white ring-2 ring-white"
+							: settled === "loss"
+								? "bg-loss text-white ring-2 ring-white"
+								: settled === "push"
+									? "bg-zinc-500 text-white ring-2 ring-white"
+									: "bg-white/90 text-black",
 						className,
 					)}
 				>
-					<Check className="size-[70%]" strokeWidth={3} />
+					<Icon className="size-[70%]" strokeWidth={3} aria-hidden />
+					{settled && <span className="sr-only">{RESULT_TEXT[settled]}</span>}
 				</motion.span>
 			)}
 		</AnimatePresence>
