@@ -146,7 +146,6 @@ export function ConfidenceBoard({
 	const locked = ranked
 		.filter((p) => p.locked && p.confidence != null)
 		.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
-	const used = new Set(ranked.map((p) => p.confidence));
 	const lost = forfeited(ranked, games.length, missed);
 	const unpicked = games.filter((g) => g.state === "pre" && !picks.has(g.id));
 
@@ -173,8 +172,6 @@ export function ConfidenceBoard({
 			<p className="mt-1 text-sm text-muted-foreground">
 				Drag your surest pick to the top. Each point value is used once.
 			</p>
-
-			<ValueStrip count={games.length} used={used} lost={lost} />
 
 			{lost.length > 0 && (
 				<p className="mt-2 text-xs text-muted-foreground">
@@ -386,39 +383,5 @@ function Matchup({ game, team }: { game: Game; team: string }) {
 				{team === game.home.abbr ? "vs" : "at"} {opponent.shortName}
 			</span>
 		</span>
-	);
-}
-
-/** 1..N pills, filled once a value is spoken for, struck out when a missed game gave it up. */
-function ValueStrip({
-	count,
-	used,
-	lost,
-}: {
-	count: number;
-	used: Set<number | null>;
-	lost: number[];
-}) {
-	return (
-		<div className="mt-3 flex flex-wrap gap-1" aria-hidden>
-			{Array.from({ length: count }, (_, i) => count - i).map((v) => (
-				<motion.span
-					key={v}
-					animate={{
-						backgroundColor: used.has(v) ? "var(--primary)" : "var(--muted)",
-						color: used.has(v)
-							? "var(--primary-foreground)"
-							: "var(--muted-foreground)",
-					}}
-					transition={{ duration: 0.2 }}
-					className={cn(
-						"grid h-6 min-w-6 place-items-center rounded px-1 text-[11px] font-semibold tabular-nums",
-						lost.includes(v) && "line-through opacity-50",
-					)}
-				>
-					{v}
-				</motion.span>
-			))}
-		</div>
 	);
 }
