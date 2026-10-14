@@ -1,4 +1,11 @@
-import { ChevronDown, ChevronUp, GripVertical, Lock } from "lucide-react";
+import {
+	ChevronDown,
+	ChevronUp,
+	GripVertical,
+	Lock,
+	LockKeyhole,
+	LockKeyholeOpen,
+} from "lucide-react";
 import {
 	AnimatePresence,
 	motion,
@@ -20,16 +27,23 @@ import {
 	rankOrder,
 	reassign,
 } from "#/lib/confidence";
-import type { Game } from "#/lib/nfl/types";
+import { playUnlockSound } from "#/lib/lock-sound";
+import type { Game, Team } from "#/lib/nfl/types";
 import { cn } from "#/lib/utils";
+import { useLockCelebration } from "./LockCelebration";
 
 interface Props {
 	games: Game[];
 	/** The user's picks this week, by game id. */
-	picks: Map<string, { team: string; confidence: number | null }>;
+	picks: Map<
+		string,
+		{ team: string; confidence: number | null; is_lock?: boolean }
+	>;
 	/** Games that kicked off without a pick. */
 	missed: number;
 	onRerank: (changes: ConfidenceChange[]) => void;
+	/** Sets or clears the Lock of the Week. Leave out to hide the lock buttons. */
+	onLock?: (gameId: string, on: boolean) => void;
 	className?: string;
 }
 
@@ -105,6 +119,7 @@ export function ConfidenceBoard({
 	picks,
 	missed,
 	onRerank,
+	onLock,
 	className,
 }: Props) {
 	const byId = useMemo(() => new Map(games.map((g) => [g.id, g])), [games]);
@@ -148,6 +163,17 @@ export function ConfidenceBoard({
 		.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
 	const lost = forfeited(ranked, games.length, missed);
 	const unpicked = games.filter((g) => g.state === "pre" && !picks.has(g.id));
+	const lockId = [...picks].find(([, p]) => p.is_lock)?.[0] ?? null;
+	// Your lock can't move once its game kicks off.
+	const lockFrozen = !!lockId && byId.get(lockId)?.state !== "pre";
+	const { celebrate, node: celebration } = useLockCelebration();
+
+	function toggleLock(gameId: string, team: Team) {
+		const on = lockId !== gameId;
+		if (on) celebrate(team);
+		else playUnlockSound();
+		onLock?.(gameId, on);
+	}
 
 	function commit(next: string[]) {
 		setOrder(next);
@@ -217,6 +243,12 @@ export function ConfidenceBoard({
 								commit(latest.current);
 							}}
 							onMove={(delta) => commit(move(order, id, delta))}
+							isLock={lockId === id}
+							onLock={
+								onLock && !lockFrozen
+									? (team) => toggleLock(id, team)
+									: undefined
+							}
 						/>
 					);
 				})}
@@ -257,12 +289,19 @@ export function ConfidenceBoard({
 										{p.confidence}
 									</span>
 									<Matchup game={game} team={team} />
+									{lockId === p.gameId && (
+										<LockKeyhole
+											className="ml-auto size-4 shrink-0 text-amber-600 dark:text-amber-300"
+											aria-label="Lock of the week"
+										/>
+									)}
 								</li>
 							);
 						})}
 					</ul>
 				</div>
 			)}
+			{celebration}
 		</section>
 	);
 }
@@ -278,6 +317,8 @@ function Row({
 	onDragStart,
 	onDragEnd,
 	onMove,
+	isLock,
+	onLock,
 }: {
 	id: string;
 	game: Game;
@@ -289,6 +330,9 @@ function Row({
 	onDragStart: () => void;
 	onDragEnd: () => void;
 	onMove: (delta: -1 | 1) => void;
+	isLock: boolean;
+	/** Missing once your lock is in play elsewhere. */
+	onLock?: (team: Team) => void;
 }) {
 	const controls = useDragControls();
 	const { held, onPointerDown } = useRowDrag((e) => controls.start(e));
@@ -312,7 +356,9 @@ function Row({
 			onPointerDown={onPointerDown}
 			onContextMenu={(e) => e.preventDefault()}
 			className={cn(
-				"relative flex cursor-grab items-center gap-2 rounded-md border bg-background py-1.5 pr-1.5 pl-1 select-none [-webkit-touch-callout:none] active:cursor-grabbing transition-[scale,box-shadow]",
+				"relative flex cursor-grab items-center gap-2 rounded-md border bg-background py-1.5 pr-1.5 pl-1 select-none [-webkit-touch-callout:none] active:cursor-grabbing transition-[scale,box-shadow,border-color,background-color]",
+				isLock &&
+					"border-amber-500/60 bg-amber-400/10 dark:border-amber-400/50",
 				held && "scale-[1.02] shadow-lg ring-2 ring-primary/40",
 			)}
 		>
@@ -345,9 +391,19 @@ function Row({
 				/>
 			)}
 			<Matchup game={game} team={team} />
+			{onLock && (
+				<LockButton
+					on={isLock}
+					name={picked.shortName}
+					onClick={() => onLock(picked)}
+				/>
+			)}
 			{/* Side by side and thumb-sized on phones, stacked and compact on wider screens. */}
 			<div
-				className="ml-auto flex shrink-0 cursor-auto sm:flex-col"
+				className={cn(
+					"flex shrink-0 cursor-auto sm:flex-col",
+					!onLock && "ml-auto",
+				)}
 				onPointerDown={(e) => e.stopPropagation()}
 			>
 				<button
@@ -370,6 +426,50 @@ function Row({
 				</button>
 			</div>
 		</Reorder.Item>
+	);
+}
+
+/** Open padlock until it's your lock; then it snaps shut in gold. */
+function LockButton({
+	on,
+	name,
+	onClick,
+}: {
+	on: boolean;
+	name: string;
+	onClick: () => void;
+}) {
+	const Icon = on ? LockKeyhole : LockKeyholeOpen;
+	return (
+		<button
+			type="button"
+			aria-pressed={on}
+			aria-label={
+				on
+					? `Remove ${name} as your Lock of the Week`
+					: `Make ${name} your Lock of the Week`
+			}
+			title={on ? "Your Lock of the Week" : "Make this your Lock of the Week"}
+			// Keep a press on the lock from starting a row drag.
+			onPointerDown={(e) => e.stopPropagation()}
+			onClick={onClick}
+			className={cn(
+				"ml-auto grid size-9 shrink-0 cursor-pointer place-items-center rounded-full transition-colors",
+				on
+					? "bg-amber-400/20 text-amber-600 hover:bg-amber-400/30 dark:text-amber-300"
+					: "text-muted-foreground/70 hover:bg-muted hover:text-foreground",
+			)}
+		>
+			<motion.span
+				key={String(on)}
+				initial={on ? { scale: 1.8, rotate: -25 } : { scale: 0.7 }}
+				animate={{ scale: 1, rotate: 0 }}
+				transition={{ type: "spring", stiffness: 600, damping: 14 }}
+				className="inline-flex"
+			>
+				<Icon className={cn("size-[18px]", on && "fill-amber-400/30")} />
+			</motion.span>
+		</button>
 	);
 }
 

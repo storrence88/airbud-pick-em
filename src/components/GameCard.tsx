@@ -3,19 +3,22 @@ import {
 	Equal,
 	Info,
 	Lock,
+	LockKeyhole,
+	LockKeyholeOpen,
 	PencilLine,
 	Sparkles,
-	Star,
 	X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useState } from "react";
+import { playUnlockSound } from "#/lib/lock-sound";
 import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
 import type { PickOutcome } from "#/lib/scoring";
 import { accentColors, splitColors } from "#/lib/team-colors";
 import { useResolvedTheme } from "#/lib/theme";
 import { cn } from "#/lib/utils";
 import { GameDetailsSheet } from "./GameDetails";
+import { useLockCelebration } from "./LockCelebration";
 import { NewDot, useNewDot } from "./NewDot";
 import { cardEffect, type EffectKind, PickEffect } from "./PickEffect";
 
@@ -123,7 +126,12 @@ export function GameCard({
 				)}
 				<span className="flex items-center gap-2">
 					{lock && (
-						<LockToggle on={lock.on} locked={locked} onToggle={lock.onToggle} />
+						<LockToggle
+							on={lock.on}
+							locked={locked}
+							team={pickedTeam ?? undefined}
+							onToggle={lock.onToggle}
+						/>
 					)}
 					{line && <span>{line}</span>}
 					{hasDetails && (
@@ -223,13 +231,17 @@ export function GameCard({
 function LockToggle({
 	on,
 	locked,
+	team,
 	onToggle,
 }: {
 	on: boolean;
 	locked: boolean;
+	team?: Team;
 	onToggle: () => void;
 }) {
+	const { celebrate, node: celebration } = useLockCelebration();
 	if (locked && !on) return null;
+	const Icon = on ? LockKeyhole : LockKeyholeOpen;
 	const content = (
 		<>
 			<motion.span
@@ -239,7 +251,10 @@ function LockToggle({
 				transition={{ type: "spring", stiffness: 500, damping: 18 }}
 				className="inline-flex"
 			>
-				<Star className={cn("size-3", on && "fill-current")} aria-hidden />
+				<Icon
+					className={cn("size-3.5", on && "fill-amber-400/30")}
+					aria-hidden
+				/>
 			</motion.span>
 			{on ? "Lock of the week" : "Lock"}
 		</>
@@ -252,15 +267,22 @@ function LockToggle({
 	);
 	if (locked) return <span className={style}>{content}</span>;
 	return (
-		<button
-			type="button"
-			onClick={onToggle}
-			aria-pressed={on}
-			title={on ? "Remove your lock" : "Make this your Lock of the Week"}
-			className={style}
-		>
-			{content}
-		</button>
+		<>
+			<button
+				type="button"
+				onClick={() => {
+					if (on) playUnlockSound();
+					else if (team) celebrate(team);
+					onToggle();
+				}}
+				aria-pressed={on}
+				title={on ? "Remove your lock" : "Make this your Lock of the Week"}
+				className={style}
+			>
+				{content}
+			</button>
+			{celebration}
+		</>
 	);
 }
 

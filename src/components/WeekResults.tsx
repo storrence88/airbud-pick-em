@@ -1,4 +1,4 @@
-import { Crown, Star } from "lucide-react";
+import { Crown, LockKeyhole } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo } from "react";
 import type { Game, Team } from "#/lib/nfl/types";
@@ -279,8 +279,8 @@ function PickCell({
 					<span className="tabular-nums">{cell.confidence}</span>
 				)}
 				{cell.isLock && (
-					<Star
-						className="absolute -top-1 -right-1 size-3 fill-amber-500 dark:fill-amber-300 text-amber-600 dark:text-amber-300"
+					<LockKeyhole
+						className="absolute -top-1 -right-1 size-3 fill-amber-300 dark:fill-amber-300/40 text-amber-600 dark:text-amber-300"
 						aria-label="Lock of the week"
 					/>
 				)}

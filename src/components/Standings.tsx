@@ -9,11 +9,11 @@ import {
 	BadgeCheck,
 	Crown,
 	Flame,
+	LockKeyhole,
 	type LucideIcon,
 	MessageSquareQuote,
 	Rocket,
 	Skull,
-	Star,
 	Toilet,
 	Zap,
 } from "lucide-react";
@@ -40,7 +40,7 @@ const BADGE_STYLE: Record<BadgeId, { icon: LucideIcon; className: string }> = {
 	},
 	perfect: { icon: BadgeCheck, className: "text-primary" },
 	upset: { icon: Zap, className: "text-sky-600 dark:text-sky-300" },
-	locks: { icon: Star, className: "text-amber-600 dark:text-amber-300" },
+	locks: { icon: LockKeyhole, className: "text-amber-600 dark:text-amber-300" },
 	"longest-streak": {
 		icon: Rocket,
 		className: "text-violet-600 dark:text-violet-300",
