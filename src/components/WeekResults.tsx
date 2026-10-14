@@ -265,20 +265,13 @@ function PickCell({
 				className={cn(
 					"relative flex h-9 items-center justify-center gap-1 rounded-md px-1.5 font-display text-sm font-semibold",
 					cell.outcome === "win" && "bg-win/15 text-win",
-					cell.outcome === "loss" && "bg-loss/10 text-loss/80",
+					cell.outcome === "loss" && "bg-loss/10 text-loss",
 					cell.outcome === "push" && "bg-muted text-muted-foreground",
 					muted && "opacity-60 saturate-50",
 				)}
 			>
 				{team.logo ? (
-					<img
-						src={team.logo}
-						alt={team.abbr}
-						className={cn(
-							"size-5",
-							cell.outcome === "loss" && "opacity-50 grayscale",
-						)}
-					/>
+					<img src={team.logo} alt={team.abbr} className="size-5" />
 				) : (
 					team.abbr
 				)}

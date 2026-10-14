@@ -31,9 +31,14 @@ import {
 	scoreAt,
 } from "#/lib/practice";
 import type { PublicProfile } from "#/lib/profile";
-import { pickOutcome, SCORING_MODES, type ScoringMode } from "#/lib/scoring";
+import {
+	pickOutcome,
+	SCORING_MODES,
+	type ScoringMode,
+	scorePick,
+} from "#/lib/scoring";
 import { cn } from "#/lib/utils";
-import { type WeekPick, weekResults } from "#/lib/week-results";
+import { toResult, type WeekPick, weekResults } from "#/lib/week-results";
 import { leagueWeekQuery } from "#/server/leagues";
 import { myProfileQuery } from "#/server/profile";
 
@@ -404,11 +409,17 @@ function Practice() {
 								];
 							}
 						const pick = mine[g.id];
+						const result = pick && {
+							pick: { gameId: g.id, ...pick },
+							game: { ...toResult(g), lockedSpread: g.spread },
+						};
 						return (
 							<GameCard
 								key={g.id}
 								game={g}
 								details={false}
+								outcome={result && pickOutcome(result.pick, result.game, mode)}
+								points={result && scorePick(result.pick, result.game, { mode })}
 								picked={pick?.team}
 								onPick={(team) => choose(g, team)}
 								lineText={g.spreadText}
