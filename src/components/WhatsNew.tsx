@@ -392,7 +392,7 @@ function ShareArt() {
 					Sunday Crew · Week 5
 				</span>
 				<span className="font-display text-3xl font-bold">11-3</span>
-				<span className="text-[11px] opacity-90">★ Lock hit · 1st place</span>
+				<span className="text-[11px] opacity-90">🔒 Lock hit · 1st place</span>
 			</motion.div>
 			<div className="absolute right-0 bottom-0 left-0 h-10 bg-muted" />
 			<div className="absolute bottom-9 left-1/2 h-1.5 w-60 -translate-x-1/2 rounded-full bg-foreground/70" />

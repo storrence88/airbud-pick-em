@@ -20,7 +20,7 @@ export function rookieTasks(s: {
 }): RookieTask[] {
 	const tasks: RookieTask[] = [
 		{ id: "pick", label: "Make your first pick", done: s.picks > 0 },
-		{ id: "lock", label: "Star a Lock of the Week", done: s.hasLock },
+		{ id: "lock", label: "Pick a Lock of the Week", done: s.hasLock },
 		{
 			id: "tiebreaker",
 			label: "Guess the Monday night total",

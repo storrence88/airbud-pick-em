@@ -390,6 +390,7 @@ function Practice() {
 								picks={new Map(Object.entries(mine))}
 								missed={0}
 								onRerank={rerank}
+								onLock={(id, on) => setLock(on ? id : null)}
 							/>
 						</motion.div>
 					)}
@@ -405,7 +406,7 @@ function Practice() {
 								const name = names.get(p.user_id) ?? "Player";
 								others[p.team] = [
 									...(others[p.team] ?? []),
-									p.is_lock ? `${name} ★` : name,
+									p.is_lock ? `${name} 🔒` : name,
 								];
 							}
 						const pick = mine[g.id];
@@ -508,7 +509,7 @@ function sayFor(
 		case "lock":
 			return {
 				key: "lock",
-				text: "Star one pick as your Lock of the Week. It's for bragging rights: your Lock record shows next to your name in the standings.",
+				text: "Tap the lock on one pick to make it your Lock of the Week. It's for bragging rights: your Lock record shows next to your name in the standings.",
 			};
 		case "tiebreaker":
 			return {

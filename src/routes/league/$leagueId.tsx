@@ -622,7 +622,7 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 								const name = names.get(p.user_id) ?? "Player";
 								others[p.team] = [
 									...(others[p.team] ?? []),
-									p.is_lock ? `${name} ★` : name,
+									p.is_lock ? `${name} 🔒` : name,
 								];
 							}
 						}
@@ -716,6 +716,7 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 						picks={mine}
 						missed={missed.length}
 						onRerank={(changes) => confidence.mutate(changes)}
+						onLock={(gameId, on) => lock.mutate({ gameId, on })}
 						className={cn(
 							"mt-6 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto",
 							view === "pick" && "hidden lg:block",
