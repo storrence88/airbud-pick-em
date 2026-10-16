@@ -4,7 +4,7 @@ import { initials, type PublicProfile } from "#/lib/profile";
 import { accentVars } from "#/lib/team-colors";
 import { cn } from "#/lib/utils";
 
-type AvatarProfile = Pick<
+export type AvatarProfile = Pick<
 	PublicProfile,
 	"display_name" | "avatar_url" | "avatar_kind" | "favorite_team"
 >;

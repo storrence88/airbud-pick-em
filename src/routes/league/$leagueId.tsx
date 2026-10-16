@@ -28,6 +28,7 @@ import { useOnline } from "#/components/ConnectionBanner";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
+import { type Picker, unknownPlayer } from "#/components/PickerAvatars";
 import { RookieChecklist } from "#/components/RookieChecklist";
 import { ShareWeek } from "#/components/ShareWeek";
 import { LeaguePageSkeleton } from "#/components/Skeleton";
@@ -270,6 +271,10 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 	);
 	const names = useMemo(
 		() => new Map(members.map((m) => [m.user_id, m.display_name])),
+		[members],
+	);
+	const profiles = useMemo(
+		() => new Map(members.map((m) => [m.user_id, m])),
 		[members],
 	);
 	const isConfidence = league.mode === "confidence";
@@ -615,14 +620,17 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 					{games.map((g, i) => {
 						const myPick = mine.get(g.id);
 						const locked = g.state !== "pre";
-						const others: Record<string, string[]> = {};
+						const others: Record<string, Picker[]> = {};
 						if (locked) {
 							for (const p of data.picks) {
 								if (p.game_id !== g.id || p.user_id === userId) continue;
-								const name = names.get(p.user_id) ?? "Player";
 								others[p.team] = [
 									...(others[p.team] ?? []),
-									p.is_lock ? `${name} 🔒` : name,
+									{
+										id: p.user_id,
+										profile: profiles.get(p.user_id) ?? unknownPlayer,
+										lock: p.is_lock,
+									},
 								];
 							}
 						}

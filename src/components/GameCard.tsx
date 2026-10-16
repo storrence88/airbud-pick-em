@@ -21,6 +21,7 @@ import { GameDetailsSheet } from "./GameDetails";
 import { useLockCelebration } from "./LockCelebration";
 import { NewDot, useNewDot } from "./NewDot";
 import { cardEffect, type EffectKind, PickEffect } from "./PickEffect";
+import { type Picker, PickerAvatars } from "./PickerAvatars";
 
 interface Props {
 	game: Game;
@@ -28,8 +29,8 @@ interface Props {
 	onPick: (abbr: string) => void;
 	/** Line text to show, e.g. the frozen ATS spread. Defaults to the feed's line. */
 	lineText?: string | null;
-	/** Names of other members who picked each team (shown once the game locks). */
-	others?: Record<string, string[]>;
+	/** Other members who picked each team (shown once the game locks). */
+	others?: Record<string, Picker[]>;
 	footer?: ReactNode;
 	/** Says which picks here the commissioner entered for someone. */
 	note?: string | null;
@@ -195,9 +196,9 @@ export function GameCard({
 			{faded && <FadedCallout crowd={faded.crowd} names={faded.names} />}
 			{others &&
 			(others[game.away.abbr]?.length || others[game.home.abbr]?.length) ? (
-				<div className="grid grid-cols-2 gap-2 px-3 pb-3 text-xs text-muted-foreground">
-					<span className="truncate">{others[game.away.abbr]?.join(", ")}</span>
-					<span className="truncate">{others[game.home.abbr]?.join(", ")}</span>
+				<div className="grid grid-cols-2 gap-2 px-3 pb-3">
+					<PickerAvatars pickers={others[game.away.abbr] ?? []} />
+					<PickerAvatars pickers={others[game.home.abbr] ?? []} />
 				</div>
 			) : null}
 			{note && (
