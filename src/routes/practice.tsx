@@ -13,6 +13,7 @@ import { ConfidenceBoard } from "#/components/ConfidenceBoard";
 import { GameCard } from "#/components/GameCard";
 import type { EffectKind } from "#/components/PickEffect";
 import { PickEffect } from "#/components/PickEffect";
+import type { Picker } from "#/components/PickerAvatars";
 import { Tiebreaker } from "#/components/Tiebreaker";
 import type { ConfidenceChange } from "#/lib/confidence";
 import { nextFreeValue } from "#/lib/confidence";
@@ -281,7 +282,6 @@ function Practice() {
 		),
 		...(plan?.friends ?? []),
 	];
-	const names = new Map(friends.map((f) => [f.id, f.profile.display_name]));
 	const rows =
 		step === "results" && plan
 			? weekResults(
@@ -399,14 +399,15 @@ function Practice() {
 				{step !== "rank" &&
 					shown.map((g) => {
 						const locked = g.state !== "pre";
-						const others: Record<string, string[]> = {};
+						const others: Record<string, Picker[]> = {};
 						if (locked)
 							for (const p of plan?.friends ?? []) {
 								if (p.game_id !== g.id) continue;
-								const name = names.get(p.user_id) ?? "Player";
+								const friend = friends.find((f) => f.id === p.user_id);
+								if (!friend) continue;
 								others[p.team] = [
 									...(others[p.team] ?? []),
-									p.is_lock ? `${name} 🔒` : name,
+									{ id: friend.id, profile: friend.profile, lock: p.is_lock },
 								];
 							}
 						const pick = mine[g.id];
