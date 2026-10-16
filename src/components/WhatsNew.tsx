@@ -321,12 +321,16 @@ function SurvivorArt() {
 								transition={loop(5, [0, at, at + 0.06, 1])}
 							/>
 							{used && (
-								<motion.span
-									className="absolute top-1/2 -right-1 -left-1 h-[3px] origin-left -rotate-[30deg] rounded-full bg-loss"
-									initial={{ scaleX: 0 }}
-									animate={{ scaleX: [0, 0, 1, 1] }}
-									transition={loop(5, [0, at, at + 0.06, 1])}
-								/>
+								// Tilted around its middle so it crosses the logo's center,
+								// then drawn from the left end.
+								<span className="absolute top-1/2 -right-1 -left-1 h-[3px] -translate-y-1/2 -rotate-[30deg]">
+									<motion.span
+										className="block size-full origin-left rounded-full bg-loss"
+										initial={{ scaleX: 0 }}
+										animate={{ scaleX: [0, 0, 1, 1] }}
+										transition={loop(5, [0, at, at + 0.06, 1])}
+									/>
+								</span>
 							)}
 						</span>
 					);
