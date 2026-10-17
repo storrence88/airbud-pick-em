@@ -22,6 +22,11 @@ import {
 	useProfile,
 } from "#/components/PlayerProfile";
 import { PlayerSheetProvider } from "#/components/PlayerSheet";
+import {
+	HeadToHead,
+	SeasonChart,
+	SignatureMoves,
+} from "#/components/ProfileExtras";
 import type { Game } from "#/lib/nfl/types";
 import { fadeWins, ordinal, type WeekFinish } from "#/lib/player-profile";
 import { formatRecord, type Tally } from "#/lib/player-stats";
@@ -59,7 +64,7 @@ type WeekGame = Game & { lockedSpread: number | null };
 function PlayerProfilePage() {
 	const { leagueId, userId } = Route.useParams();
 	const profile = useProfile(leagueId, userId);
-	const { week, member, summary, me } = profile;
+	const { week, member, summary, extras, me } = profile;
 
 	return (
 		<PlayerSheetProvider leagueId={leagueId}>
@@ -119,6 +124,13 @@ function PlayerProfilePage() {
 							<WeekStrip leagueId={leagueId} weeks={summary?.weeks ?? null} />
 						</Section>
 
+						<Section title="Season so far">
+							<SeasonChart
+								points={extras?.line ?? null}
+								name={me ? "You" : member.display_name}
+							/>
+						</Section>
+
 						<Section title="Trophy shelf">
 							<TrophyShelf
 								leagueId={leagueId}
@@ -126,6 +138,14 @@ function PlayerProfilePage() {
 								weeksWon={summary?.weeksWon ?? null}
 								locks={summary?.locks ?? null}
 							/>
+						</Section>
+
+						<Section title="Signature moves">
+							<SignatureMoves signature={extras?.signature ?? null} />
+						</Section>
+
+						<Section title={me ? "Compare" : "Head to head"}>
+							<HeadToHead leagueId={leagueId} userId={userId} />
 						</Section>
 
 						<RecentPicks leagueId={leagueId} userId={userId} me={me} />
