@@ -1,11 +1,18 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { Crown, Toilet } from "lucide-react";
-import { motion } from "motion/react";
+import { Crown, Swords, Toilet } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useMemo, useState } from "react";
 import { FLAME_AT } from "#/lib/flair";
 import { teamByAbbr, teamLogo } from "#/lib/nfl/teams";
 import { ordinal, profileSummary } from "#/lib/player-profile";
 import { winPct } from "#/lib/player-stats";
+import {
+	badgeHistory,
+	rivalFor,
+	seasonLine,
+	signatureMoves,
+} from "#/lib/profile-extras";
+import { computeStandings } from "#/lib/standings";
 import { accentVars } from "#/lib/team-colors";
 import { cn } from "#/lib/utils";
 import { leagueWeekQuery, standingsQuery } from "#/server/leagues";
@@ -30,8 +37,27 @@ export function useProfile(leagueId: string, userId: string) {
 			{ mode, pushValue },
 		);
 	}, [standings, member, week.members, userId, mode, pushValue]);
+	const extras = useMemo(() => {
+		if (!standings || !member) return null;
+		const ids = week.members.map((m) => m.user_id);
+		const settings = { mode, pushValue };
+		const { picks, games, weeks } = standings;
+		return {
+			rival: rivalFor(userId, computeStandings(ids, picks, games, settings)),
+			history: badgeHistory(userId, ids, picks, games, weeks, settings),
+			signature: signatureMoves(userId, picks, games, settings),
+			line: seasonLine(userId, ids, picks, games, weeks, settings),
+		};
+	}, [standings, member, week.members, userId, mode, pushValue]);
 	const talk = week.trashTalk.lines.find((l) => l.user_id === userId)?.body;
-	return { week, member, summary, talk, me: userId === week.userId };
+	return {
+		week,
+		member,
+		summary,
+		extras,
+		talk,
+		me: userId === week.userId,
+	};
 }
 
 export type ProfileData = ReturnType<typeof useProfile>;
@@ -44,7 +70,7 @@ const memberSince = (iso: string) =>
 
 /** Avatar, name, title, favorite team, flair and this week's trash talk. */
 export function ProfileHeader({
-	profile: { member, summary, talk, me },
+	profile: { member, summary, extras, talk, me },
 	titleId,
 	compact,
 }: {
@@ -57,6 +83,11 @@ export function ProfileHeader({
 	const team = teamByAbbr(member.favorite_team);
 	const badges = summary?.badges ?? [];
 	const detail = badges.find((b) => b.id === open)?.detail;
+	// The worst-week badge already names its week.
+	const history =
+		open && open !== "worst-week"
+			? (extras?.history[open as keyof typeof extras.history] ?? [])
+			: [];
 	return (
 		<div
 			className={cn(
@@ -159,9 +190,28 @@ export function ProfileHeader({
 					})}
 				</div>
 			)}
-			{detail && (
-				<p className="relative mt-2 text-xs text-muted-foreground">{detail}</p>
-			)}
+			<AnimatePresence initial={false}>
+				{detail && (
+					<motion.div
+						key={open}
+						initial={{ height: 0, opacity: 0 }}
+						animate={{ height: "auto", opacity: 1 }}
+						exit={{ height: 0, opacity: 0 }}
+						className="relative overflow-hidden text-xs text-muted-foreground"
+					>
+						<p className="pt-2 font-semibold text-foreground">{detail}</p>
+						{history.length > 0 && (
+							<ul className="mt-1 grid gap-0.5">
+								{history.map((h) => (
+									<li key={h} className="tabular-nums">
+										{h}
+									</li>
+								))}
+							</ul>
+						)}
+					</motion.div>
+				)}
+			</AnimatePresence>
 			{talk && (
 				<blockquote className="relative mt-4 border-l-2 border-[var(--tc,var(--primary))] pl-3 text-sm italic">
 					“{talk}”
@@ -173,10 +223,19 @@ export function ProfileHeader({
 
 /** Standings place, points, win rate and streak. */
 export function SeasonTiles({
-	profile: { summary, week },
+	profile: { summary, extras, week },
 }: {
 	profile: ProfileData;
 }) {
+	const rival = extras?.rival;
+	const rivalName = rival
+		? rival.userId === week.userId
+			? "you"
+			: (week.members.find((m) => m.user_id === rival.userId)?.display_name ??
+				"Player")
+		: null;
+	const pts = (n: number) =>
+		`${Math.round(n * 10) / 10} ${n === 1 ? "pt" : "pts"}`;
 	const mode = week.league.mode;
 	const pct = summary ? winPct(summary.record) : null;
 	const tiles: { label: string; value: ReactNode; note?: string }[] = [
@@ -235,6 +294,19 @@ export function SeasonTiles({
 					</div>
 				</motion.div>
 			))}
+			{rival && rivalName && (
+				<p className="col-span-2 flex items-center gap-1.5 text-xs text-muted-foreground sm:col-span-4">
+					<Swords className="size-3.5 shrink-0" aria-hidden />
+					<span>
+						Rival:{" "}
+						<span className="font-semibold text-foreground">
+							{rival.gap === 0
+								? `tied with ${rivalName}`
+								: `${pts(rival.gap)} ${rival.ahead ? "ahead of" : "behind"} ${rivalName}`}
+						</span>
+					</span>
+				</p>
+			)}
 		</div>
 	);
 }
