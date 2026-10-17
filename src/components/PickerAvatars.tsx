@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Avatar, type AvatarProfile } from "./Avatar";
+import { PlayerLink, usePlayerSheet } from "./PlayerSheet";
 
 /** Another member's pick on a game, shown once the game locks. */
 export interface Picker {
@@ -22,8 +23,9 @@ export const unknownPlayer: AvatarProfile = {
 const SIZE = 28;
 
 /**
- * A row of the members who picked one side. Hovering an avatar (or tapping it
- * on a phone) shows whose it is.
+ * A row of the members who picked one side. Hovering an avatar shows whose it
+ * is. On the league page a tap opens their quick profile and a click their
+ * full profile; elsewhere a tap shows the name.
  */
 export function PickerAvatars({ pickers }: { pickers: Picker[] }) {
 	const [open, setOpen] = useState<string | null>(null);
@@ -55,7 +57,9 @@ function PickerAvatar({
 	onClose: () => void;
 }) {
 	const button = useRef<HTMLButtonElement>(null);
+	const link = useRef<HTMLAnchorElement>(null);
 	const mouse = useRef(false);
+	const sheet = usePlayerSheet();
 	const name = picker.profile.display_name;
 	const label = picker.lock ? `${name}, Lock of the Week` : name;
 
@@ -63,7 +67,8 @@ function PickerAvatar({
 	useEffect(() => {
 		if (!open) return;
 		const away = (e: PointerEvent) => {
-			if (!button.current?.contains(e.target as Node)) onClose();
+			const el = button.current ?? link.current;
+			if (!el?.contains(e.target as Node)) onClose();
 		};
 		document.addEventListener("pointerdown", away);
 		window.addEventListener("scroll", onClose, { passive: true });
@@ -72,6 +77,34 @@ function PickerAvatar({
 			window.removeEventListener("scroll", onClose);
 		};
 	}, [open, onClose]);
+
+	const badge = picker.lock && (
+		<span className="absolute -right-1.5 -bottom-1 grid size-3.5 place-items-center rounded-full bg-amber-400 text-black ring-2 ring-card">
+			<LockKeyhole className="size-2" strokeWidth={3} aria-hidden />
+		</span>
+	);
+
+	// On the league page the avatar opens the player's profile: a tap opens
+	// the quick sheet, a click the full page. Hover still shows the name.
+	if (sheet)
+		return (
+			<>
+				<PlayerLink
+					userId={picker.id}
+					label={label}
+					linkRef={link}
+					className="relative block rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					onPointerEnter={(e) => e.pointerType === "mouse" && onOpen()}
+					onPointerLeave={(e) => e.pointerType === "mouse" && onClose()}
+					onFocus={(e) => e.currentTarget.matches(":focus-visible") && onOpen()}
+					onBlur={onClose}
+				>
+					<Avatar profile={picker.profile} size={SIZE} />
+					{badge}
+				</PlayerLink>
+				<NameTip anchor={link} open={open} label={name} lock={picker.lock} />
+			</>
+		);
 
 	return (
 		<>
@@ -94,11 +127,7 @@ function PickerAvatar({
 				}}
 			>
 				<Avatar profile={picker.profile} size={SIZE} />
-				{picker.lock && (
-					<span className="absolute -right-1.5 -bottom-1 grid size-3.5 place-items-center rounded-full bg-amber-400 text-black ring-2 ring-card">
-						<LockKeyhole className="size-2" strokeWidth={3} aria-hidden />
-					</span>
-				)}
+				{badge}
 			</button>
 			<NameTip anchor={button} open={open} label={name} lock={picker.lock} />
 		</>
@@ -115,7 +144,7 @@ function NameTip({
 	label,
 	lock,
 }: {
-	anchor: React.RefObject<HTMLButtonElement | null>;
+	anchor: React.RefObject<HTMLElement | null>;
 	open: boolean;
 	label: string;
 	lock?: boolean;

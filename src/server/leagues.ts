@@ -26,6 +26,8 @@ export interface League {
 export interface Member extends PublicProfile {
 	user_id: string;
 	role: "commissioner" | "member";
+	/** When they joined this league. */
+	joined_at?: string | null;
 }
 
 /** Someone removed from the league whose picks were kept. */
@@ -62,14 +64,20 @@ async function requireUser() {
 	return { sb, user: data.user };
 }
 
-const MEMBER_COLUMNS = `user_id, role, profiles(${PUBLIC_PROFILE_COLUMNS})`;
+const MEMBER_COLUMNS = `user_id, role, joined_at, profiles(${PUBLIC_PROFILE_COLUMNS})`;
 
 /** A league_members row joined with its profile, as selected by MEMBER_COLUMNS. */
-function toMember(m: { user_id: string; role: string; profiles: unknown }) {
+function toMember(m: {
+	user_id: string;
+	role: string;
+	joined_at?: string | null;
+	profiles: unknown;
+}) {
 	const p = m.profiles as PublicProfile | null;
 	return {
 		user_id: m.user_id,
 		role: m.role,
+		joined_at: m.joined_at ?? null,
 		display_name: p?.display_name ?? "Player",
 		avatar_url: p?.avatar_url ?? null,
 		avatar_kind: p?.avatar_kind ?? "photo",

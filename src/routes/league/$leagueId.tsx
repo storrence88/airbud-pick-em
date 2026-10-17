@@ -29,6 +29,7 @@ import { GameCard, PublicPicksNote } from "#/components/GameCard";
 import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
 import { type Picker, unknownPlayer } from "#/components/PickerAvatars";
+import { PlayerSheetProvider } from "#/components/PlayerSheet";
 import { RookieChecklist } from "#/components/RookieChecklist";
 import { ShareWeek } from "#/components/ShareWeek";
 import { LeaguePageSkeleton } from "#/components/Skeleton";
@@ -142,76 +143,78 @@ function LeaguePage() {
 	}, [user, leagueId, league.mode, navigate]);
 
 	return (
-		<main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
-			<div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-				<div className="min-w-0">
-					<div className="text-xs font-semibold uppercase tracking-wider text-primary">
-						{SCORING_MODES[league.mode].label}
+		<PlayerSheetProvider leagueId={leagueId}>
+			<main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
+				<div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+					<div className="min-w-0">
+						<div className="text-xs font-semibold uppercase tracking-wider text-primary">
+							{SCORING_MODES[league.mode].label}
+						</div>
+						<h1 className="font-display text-3xl font-bold uppercase break-words sm:text-4xl">
+							{league.name}
+						</h1>
 					</div>
-					<h1 className="font-display text-3xl font-bold uppercase break-words sm:text-4xl">
-						{league.name}
-					</h1>
+					<div className="flex items-center gap-2">
+						<SurvivorLink leagueId={leagueId} />
+						<InviteButton code={league.invite_code} />
+						{isCommissioner && (
+							<Link
+								to="/league/$leagueId/settings"
+								params={{ leagueId }}
+								aria-label="League settings"
+								title="League settings"
+								className="grid size-10 place-items-center rounded-full border transition-colors hover:bg-muted"
+							>
+								<Settings className="size-4" aria-hidden />
+							</Link>
+						)}
+					</div>
 				</div>
-				<div className="flex items-center gap-2">
-					<SurvivorLink leagueId={leagueId} />
-					<InviteButton code={league.invite_code} />
-					{isCommissioner && (
-						<Link
-							to="/league/$leagueId/settings"
-							params={{ leagueId }}
-							aria-label="League settings"
-							title="League settings"
-							className="grid size-10 place-items-center rounded-full border transition-colors hover:bg-muted"
+				<WeekWinnerBanner leagueId={leagueId} />
+				<div className="relative mt-6 inline-flex rounded-full border bg-card p-1 text-sm font-semibold">
+					{(["picks", "standings"] as const).map((t) => (
+						<button
+							key={t}
+							type="button"
+							onClick={() => setTab(t)}
+							className={cn(
+								"relative h-9 rounded-full px-5 capitalize transition-colors",
+								tab === t ? "text-primary-foreground" : "text-muted-foreground",
+							)}
 						>
-							<Settings className="size-4" aria-hidden />
-						</Link>
-					)}
+							{tab === t && (
+								<motion.span
+									layoutId="tab"
+									className="absolute inset-0 rounded-full bg-primary"
+									transition={{ type: "spring", stiffness: 400, damping: 32 }}
+								/>
+							)}
+							<span className="relative">{t}</span>
+						</button>
+					))}
 				</div>
-			</div>
-			<WeekWinnerBanner leagueId={leagueId} />
-			<div className="relative mt-6 inline-flex rounded-full border bg-card p-1 text-sm font-semibold">
-				{(["picks", "standings"] as const).map((t) => (
-					<button
-						key={t}
-						type="button"
-						onClick={() => setTab(t)}
-						className={cn(
-							"relative h-9 rounded-full px-5 capitalize transition-colors",
-							tab === t ? "text-primary-foreground" : "text-muted-foreground",
-						)}
+				<AnimatePresence mode="wait">
+					<motion.div
+						key={tab}
+						initial={{ opacity: 0, y: 8 }}
+						animate={{ opacity: 1, y: 0 }}
+						exit={{ opacity: 0, y: -8 }}
+						transition={{ duration: 0.15 }}
 					>
-						{tab === t && (
-							<motion.span
-								layoutId="tab"
-								className="absolute inset-0 rounded-full bg-primary"
-								transition={{ type: "spring", stiffness: 400, damping: 32 }}
-							/>
+						{tab === "picks" ? (
+							<WeekPicks leagueId={leagueId} week={week} />
+						) : (
+							<Standings leagueId={leagueId} />
 						)}
-						<span className="relative">{t}</span>
-					</button>
-				))}
-			</div>
-			<AnimatePresence mode="wait">
-				<motion.div
-					key={tab}
-					initial={{ opacity: 0, y: 8 }}
-					animate={{ opacity: 1, y: 0 }}
-					exit={{ opacity: 0, y: -8 }}
-					transition={{ duration: 0.15 }}
-				>
-					{tab === "picks" ? (
-						<WeekPicks leagueId={leagueId} week={week} />
-					) : (
-						<Standings leagueId={leagueId} />
-					)}
-				</motion.div>
-			</AnimatePresence>
-			<LeaveLeague
-				leagueId={leagueId}
-				leagueName={league.name}
-				isCommissioner={isCommissioner}
-			/>
-		</main>
+					</motion.div>
+				</AnimatePresence>
+				<LeaveLeague
+					leagueId={leagueId}
+					leagueName={league.name}
+					isCommissioner={isCommissioner}
+				/>
+			</main>
+		</PlayerSheetProvider>
 	);
 }
 

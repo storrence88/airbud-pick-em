@@ -5,18 +5,7 @@ import {
 	useSuspenseQuery,
 } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import {
-	BadgeCheck,
-	Crown,
-	Flame,
-	LockKeyhole,
-	type LucideIcon,
-	MessageSquareQuote,
-	Rocket,
-	Skull,
-	Toilet,
-	Zap,
-} from "lucide-react";
+import { MessageSquareQuote, Toilet } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { type Badge, type BadgeId, computeFlair, FLAME_AT } from "#/lib/flair";
@@ -30,23 +19,10 @@ import {
 	standingsQuery,
 } from "#/server/leagues";
 import { Avatar } from "./Avatar";
+import { BADGE_STYLE, StreakFlame } from "./Flair";
+import { PlayerLink } from "./PlayerSheet";
 import { RowsSkeleton } from "./Skeleton";
 import { WeekLeaderboard } from "./WeekLeaderboard";
-
-const BADGE_STYLE: Record<BadgeId, { icon: LucideIcon; className: string }> = {
-	"week-winner": {
-		icon: Crown,
-		className: "text-amber-600 dark:text-amber-300",
-	},
-	perfect: { icon: BadgeCheck, className: "text-primary" },
-	upset: { icon: Zap, className: "text-sky-600 dark:text-sky-300" },
-	locks: { icon: LockKeyhole, className: "text-amber-600 dark:text-amber-300" },
-	"longest-streak": {
-		icon: Rocket,
-		className: "text-violet-600 dark:text-violet-300",
-	},
-	"worst-week": { icon: Skull, className: "text-muted-foreground" },
-};
 
 export function Standings({ leagueId }: { leagueId: string }) {
 	const [view, setView] = useState<"season" | "weekly">("season");
@@ -232,14 +208,14 @@ function StandingRow({
 				<Avatar profile={member} size={36} />
 				<div className="min-w-0 flex-1">
 					<div className="flex min-w-0 items-center gap-1.5">
-						<Link
-							to="/league/$leagueId/stats/$userId"
-							params={{ leagueId, userId: member.user_id }}
-							title="Season stats"
+						<PlayerLink
+							leagueId={leagueId}
+							userId={member.user_id}
+							title="Profile"
 							className="truncate font-semibold underline-offset-4 hover:underline"
 						>
 							{member.display_name}
-						</Link>
+						</PlayerLink>
 						{streak >= FLAME_AT && <StreakFlame streak={streak} />}
 						{lastPlace && (
 							<span
@@ -311,28 +287,6 @@ function StandingRow({
 				)}
 			</AnimatePresence>
 		</motion.li>
-	);
-}
-
-function StreakFlame({ streak }: { streak: number }) {
-	return (
-		<span
-			title={`${streak} right in a row`}
-			className="inline-flex shrink-0 items-center gap-0.5 text-xs font-bold text-orange-600 dark:text-orange-400 tabular-nums"
-		>
-			<motion.span
-				className="inline-flex origin-bottom"
-				animate={{
-					scaleY: [1, 1.12, 0.96, 1.06, 1],
-					rotate: [0, -3, 2, -1, 0],
-				}}
-				transition={{ duration: 1.6, repeat: Number.POSITIVE_INFINITY }}
-			>
-				<Flame className="size-4 fill-orange-500/40" aria-hidden />
-			</motion.span>
-			{streak}
-			<span className="sr-only"> right in a row</span>
-		</span>
 	);
 }
 
