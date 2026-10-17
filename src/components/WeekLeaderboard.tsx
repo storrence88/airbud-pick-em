@@ -9,6 +9,7 @@ import { cn } from "#/lib/utils";
 import { rankWeek, type WeekRow, weekWinners } from "#/lib/weekly";
 import { leagueWeekQuery, standingsQuery } from "#/server/leagues";
 import { Avatar } from "./Avatar";
+import { PlayerLink } from "./PlayerSheet";
 import { RowsSkeleton } from "./Skeleton";
 
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
@@ -68,12 +69,19 @@ export function WeekWinnerBanner({ leagueId }: { leagueId: string }) {
 						{result.winners.slice(0, 3).map((w) => {
 							const m = members.get(w.userId);
 							return m ? (
-								<Avatar
+								<PlayerLink
 									key={w.userId}
-									profile={m}
-									size={28}
-									className="ring-2 ring-background"
-								/>
+									leagueId={leagueId}
+									userId={w.userId}
+									label={m.display_name}
+									className="rounded-full"
+								>
+									<Avatar
+										profile={m}
+										size={28}
+										className="ring-2 ring-background"
+									/>
+								</PlayerLink>
 							) : null;
 						})}
 					</div>
@@ -83,9 +91,18 @@ export function WeekWinnerBanner({ leagueId }: { leagueId: string }) {
 							{result.winners.length > 1 ? "co-winners" : "winner"}
 						</div>
 						<div className="truncate font-semibold">
-							{result.winners
-								.map((w) => members.get(w.userId)?.display_name ?? "Player")
-								.join(" & ")}
+							{result.winners.map((w, i) => (
+								<span key={w.userId}>
+									{i > 0 && " & "}
+									<PlayerLink
+										leagueId={leagueId}
+										userId={w.userId}
+										className="underline-offset-4 hover:underline"
+									>
+										{members.get(w.userId)?.display_name ?? "Player"}
+									</PlayerLink>
+								</span>
+							))}
 							<span className="font-normal text-muted-foreground">
 								{" "}
 								· {fmt(result.winners[0].points)} pts
@@ -285,7 +302,12 @@ function WeekRowItem({
 			/>
 			<div className="min-w-0 flex-1">
 				<div className="flex min-w-0 items-center gap-1.5">
-					<span className="truncate font-semibold">{profile.display_name}</span>
+					<PlayerLink
+						userId={row.userId}
+						className="truncate font-semibold underline-offset-4 hover:underline"
+					>
+						{profile.display_name}
+					</PlayerLink>
 					{winner && (
 						<span title="Won the week" className="inline-flex shrink-0">
 							<Crown
