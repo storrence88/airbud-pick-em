@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, SendHorizontal, SmilePlus, Trash2 } from "lucide-react";
+import {
+	Ellipsis,
+	MessageCircle,
+	SendHorizontal,
+	SmilePlus,
+	Trash2,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import {
 	createContext,
@@ -28,8 +34,10 @@ import {
 	setReaction,
 	weekCommentsQuery,
 } from "#/server/comments";
+import { type LeagueEmoji, leagueEmojiQuery } from "#/server/emoji";
 import type { Member } from "#/server/leagues";
 import { Avatar } from "./Avatar";
+import { EmojiGlyph, EmojiPicker } from "./EmojiPicker";
 import { unknownPlayer } from "./PickerAvatars";
 
 interface CommentsContextValue {
@@ -44,6 +52,8 @@ interface CommentsContextValue {
 	openGameId?: string;
 	onOpened: () => void;
 	queryKey: readonly unknown[];
+	/** The league's own uploaded emoji. */
+	emoji: LeagueEmoji[];
 }
 
 const CommentsContext = createContext<CommentsContextValue | null>(null);
@@ -69,6 +79,7 @@ export function CommentsProvider({
 	const query = weekCommentsQuery(leagueId, gameIds);
 	const { data: comments = [] } = useQuery(query);
 	const { data: mentions = [] } = useQuery(myMentionsQuery());
+	const { data: emoji = [] } = useQuery(leagueEmojiQuery(leagueId));
 	const value = useMemo(() => {
 		const byGame = new Map<string, CommentRow[]>();
 		for (const c of comments)
@@ -89,8 +100,10 @@ export function CommentsProvider({
 			openGameId,
 			onOpened,
 			queryKey: query.queryKey,
+			emoji,
 		};
 	}, [
+		emoji,
 		comments,
 		mentions,
 		leagueId,
@@ -216,6 +229,7 @@ function CommentItem({ comment }: { comment: CommentRow }) {
 	const ctx = useComments();
 	const qc = useQueryClient();
 	const [picker, setPicker] = useState(false);
+	const [fullPicker, setFullPicker] = useState(false);
 	const [confirm, setConfirm] = useState(false);
 	if (!ctx) return null;
 	const author = ctx.members.find((m) => m.user_id === comment.author_id);
@@ -337,14 +351,14 @@ function CommentItem({ comment }: { comment: CommentRow }) {
 								exit={{ scale: 0 }}
 								whileTap={{ scale: 0.85 }}
 								onClick={() => react(g.emoji, !g.mine)}
-								title={g.userIds.map(nameOf).join(", ")}
+								title={`${g.userIds.map(nameOf).join(", ")}${g.emoji.startsWith(":") ? ` ${g.emoji}` : ""}`}
 								aria-pressed={g.mine}
 								className={cn(
 									"flex h-7 items-center gap-1 rounded-full border px-2 text-sm transition-colors",
 									g.mine ? "border-primary/50 bg-primary/10" : "hover:bg-muted",
 								)}
 							>
-								<span aria-hidden>{g.emoji}</span>
+								<EmojiGlyph emoji={g.emoji} custom={ctx.emoji} size={16} />
 								<span className="text-xs font-semibold tabular-nums">
 									{g.count}
 								</span>
@@ -395,10 +409,39 @@ function CommentItem({ comment }: { comment: CommentRow }) {
 											</motion.button>
 										);
 									})}
+									<motion.button
+										type="button"
+										initial={{ opacity: 0, y: 8 }}
+										animate={{ opacity: 1, y: 0 }}
+										transition={{ delay: REACTIONS.length * 0.025 }}
+										whileTap={{ scale: 0.8 }}
+										onClick={() => {
+											setPicker(false);
+											setFullPicker(true);
+										}}
+										aria-label="More reactions and custom emoji"
+										title="More, and custom emoji"
+										className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+									>
+										<Ellipsis className="size-5" />
+									</motion.button>
 								</motion.div>
 							)}
 						</AnimatePresence>
 					</div>
+					<EmojiPicker
+						open={fullPicker}
+						onClose={() => setFullPicker(false)}
+						onPick={(e) => {
+							const on = groups.some((g) => g.emoji === e && g.mine);
+							react(e, !on);
+						}}
+						leagueId={ctx.leagueId}
+						userId={ctx.userId}
+						canModerate={ctx.canModerate}
+						custom={ctx.emoji}
+						mine={groups.filter((g) => g.mine).map((g) => g.emoji)}
+					/>
 				</div>
 			</div>
 		</motion.li>

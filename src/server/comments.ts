@@ -2,7 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
-	isReaction,
+	isValidReaction,
 	MAX_COMMENT,
 	mentionedIds,
 	type ReactionRow,
@@ -135,7 +135,7 @@ export const setReaction = createServerFn({ method: "POST" })
 	.inputValidator(
 		z.object({
 			commentId: z.string().uuid(),
-			emoji: z.string().refine(isReaction),
+			emoji: z.string().refine(isValidReaction),
 			on: z.boolean(),
 		}),
 	)
