@@ -29,6 +29,13 @@ export function customEmojiName(emoji: string) {
 export const isValidReaction = (s: string) =>
 	isReaction(s) || customEmojiName(s) != null;
 
+/** A GIPHY GIF id: letters and digits only, so it's safe in a URL. */
+export const GIF_ID = /^[A-Za-z0-9]{1,64}$/;
+
+/** A GIPHY GIF's image, 200px wide (small and quick to load). */
+export const gifUrl = (id: string) =>
+	`https://media.giphy.com/media/${id}/200w.webp`;
+
 /** A custom emoji name suggested from an uploaded file's name. */
 export function emojiNameFromFile(filename: string) {
 	return filename

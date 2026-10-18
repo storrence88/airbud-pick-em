@@ -5,6 +5,7 @@ import {
 	SendHorizontal,
 	SmilePlus,
 	Trash2,
+	X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -35,9 +36,11 @@ import {
 	weekCommentsQuery,
 } from "#/server/comments";
 import { type LeagueEmoji, leagueEmojiQuery } from "#/server/emoji";
+import type { Gif } from "#/server/gifs";
 import type { Member } from "#/server/leagues";
 import { Avatar } from "./Avatar";
 import { EmojiGlyph, EmojiPicker } from "./EmojiPicker";
+import { GifImage, GifPicker } from "./GifPicker";
 import { unknownPlayer } from "./PickerAvatars";
 
 interface CommentsContextValue {
@@ -320,25 +323,35 @@ function CommentItem({ comment }: { comment: CommentRow }) {
 							</button>
 						))}
 				</div>
-				<p className="text-sm break-words whitespace-pre-wrap">
-					{parseMentions(comment.body, ctx.members).map((p, i) =>
-						p.kind === "mention" ? (
-							<span
+				{comment.body && (
+					<p className="text-sm break-words whitespace-pre-wrap">
+						{parseMentions(comment.body, ctx.members).map((p, i) =>
+							p.kind === "mention" ? (
+								<span
+									// biome-ignore lint/suspicious/noArrayIndexKey: parts never reorder
+									key={i}
+									className={cn(
+										"rounded px-0.5 font-semibold text-primary",
+										p.userId === ctx.userId && "bg-primary/15",
+									)}
+								>
+									{p.text}
+								</span>
+							) : (
 								// biome-ignore lint/suspicious/noArrayIndexKey: parts never reorder
-								key={i}
-								className={cn(
-									"rounded px-0.5 font-semibold text-primary",
-									p.userId === ctx.userId && "bg-primary/15",
-								)}
-							>
-								{p.text}
-							</span>
-						) : (
-							// biome-ignore lint/suspicious/noArrayIndexKey: parts never reorder
-							<span key={i}>{p.text}</span>
-						),
-					)}
-				</p>
+								<span key={i}>{p.text}</span>
+							),
+						)}
+					</p>
+				)}
+				{comment.gif_id && (
+					<GifImage
+						id={comment.gif_id}
+						width={comment.gif_width ?? 200}
+						height={comment.gif_height ?? 150}
+						className="mt-1.5 h-auto w-full max-w-[220px] rounded-xl bg-muted"
+					/>
+				)}
 				<div className="mt-1.5 flex flex-wrap items-center gap-1.5">
 					<AnimatePresence initial={false}>
 						{groups.map((g) => (
@@ -456,15 +469,25 @@ export function CommentComposer({ gameId }: { gameId: string }) {
 	const [cursor, setCursor] = useState(0);
 	const [active, setActive] = useState(0);
 	const [error, setError] = useState("");
+	const [gif, setGif] = useState<Gif | null>(null);
+	const [gifs, setGifs] = useState(false);
 	const box = useRef<HTMLTextAreaElement>(null);
 
 	const send = useMutation({
 		mutationFn: (body: string) =>
 			postComment({
-				data: { leagueId: ctx?.leagueId ?? "", gameId, body },
+				data: {
+					leagueId: ctx?.leagueId ?? "",
+					gameId,
+					body,
+					gif: gif
+						? { id: gif.id, width: gif.width, height: gif.height }
+						: undefined,
+				},
 			}),
 		onSuccess: () => {
 			setText("");
+			setGif(null);
 			setError("");
 			if (ctx) qc.invalidateQueries({ queryKey: ctx.queryKey });
 		},
@@ -498,11 +521,51 @@ export function CommentComposer({ gameId }: { gameId: string }) {
 	};
 	const submit = () => {
 		const body = text.trim();
-		if (body && !send.isPending) send.mutate(body);
+		if ((body || gif) && !send.isPending) send.mutate(body);
 	};
 
 	return (
 		<div className="shrink-0 border-t bg-card px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+			<AnimatePresence>
+				{gifs && (
+					<GifPicker
+						onClose={() => setGifs(false)}
+						onPick={(g) => {
+							setGif(g);
+							setGifs(false);
+							requestAnimationFrame(() => box.current?.focus());
+						}}
+					/>
+				)}
+			</AnimatePresence>
+			<AnimatePresence>
+				{gif && (
+					<motion.div
+						initial={{ opacity: 0, height: 0 }}
+						animate={{ opacity: 1, height: "auto" }}
+						exit={{ opacity: 0, height: 0 }}
+						className="overflow-hidden"
+					>
+						<div className="relative mt-1.5 mb-2 w-fit">
+							<GifImage
+								id={gif.id}
+								width={gif.width}
+								height={gif.height}
+								alt={gif.title}
+								className="h-24 w-auto rounded-xl bg-muted"
+							/>
+							<button
+								type="button"
+								onClick={() => setGif(null)}
+								aria-label="Remove GIF"
+								className="absolute -top-1.5 -right-1.5 grid size-6 place-items-center rounded-full bg-foreground text-background shadow"
+							>
+								<X className="size-3.5" />
+							</button>
+						</div>
+					</motion.div>
+				)}
+			</AnimatePresence>
 			<AnimatePresence>
 				{matches.length > 0 && (
 					<motion.ul
@@ -541,12 +604,28 @@ export function CommentComposer({ gameId }: { gameId: string }) {
 				}}
 				className="flex items-end gap-2"
 			>
+				<motion.button
+					type="button"
+					whileTap={{ scale: 0.88 }}
+					onClick={() => setGifs(!gifs)}
+					aria-label="Add a GIF"
+					aria-expanded={gifs}
+					title="GIF"
+					className={cn(
+						"grid h-10 shrink-0 place-items-center rounded-full border px-2.5 text-[11px] font-extrabold tracking-wide transition-colors",
+						gifs || gif
+							? "border-primary bg-primary/10 text-primary"
+							: "text-muted-foreground hover:bg-muted hover:text-foreground",
+					)}
+				>
+					GIF
+				</motion.button>
 				<textarea
 					ref={box}
 					value={text}
 					rows={1}
 					maxLength={MAX_COMMENT}
-					placeholder="Say something… @ to mention"
+					placeholder={gif ? "Add a caption…" : "Say something… @ to mention"}
 					aria-label="Write a comment"
 					onChange={(e) => {
 						setText(e.target.value);
@@ -582,7 +661,7 @@ export function CommentComposer({ gameId }: { gameId: string }) {
 				<motion.button
 					type="submit"
 					whileTap={{ scale: 0.88 }}
-					disabled={!text.trim() || send.isPending}
+					disabled={!(text.trim() || gif) || send.isPending}
 					aria-label="Send comment"
 					className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
 				>

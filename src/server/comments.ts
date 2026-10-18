@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+	GIF_ID,
 	isValidReaction,
 	MAX_COMMENT,
 	mentionedIds,
@@ -14,6 +15,9 @@ export interface CommentRow {
 	game_id: string;
 	author_id: string;
 	body: string;
+	gif_id: string | null;
+	gif_width: number | null;
+	gif_height: number | null;
 	created_at: string;
 	reactions: ReactionRow[];
 }
@@ -24,6 +28,8 @@ export interface MentionNote {
 	seen: boolean;
 	created_at: string;
 	body: string;
+	/** The comment is (or includes) a GIF. */
+	gif: boolean;
 	author_id: string;
 	author_name: string;
 	league_id: string;
@@ -51,7 +57,7 @@ export const getWeekComments = createServerFn({ method: "GET" })
 		const { data: rows, error } = await sb
 			.from("comments")
 			.select(
-				"id, game_id, author_id, body, created_at, comment_reactions(user_id, emoji)",
+				"id, game_id, author_id, body, gif_id, gif_width, gif_height, created_at, comment_reactions(user_id, emoji)",
 			)
 			.eq("league_id", data.leagueId)
 			.in("game_id", data.gameIds)
@@ -76,10 +82,19 @@ export const postComment = createServerFn({ method: "POST" })
 		z.object({
 			leagueId: z.string().uuid(),
 			gameId: z.string().max(20),
-			body: z.string().trim().min(1).max(MAX_COMMENT),
+			body: z.string().trim().max(MAX_COMMENT),
+			gif: z
+				.object({
+					id: z.string().regex(GIF_ID),
+					width: z.number().int().min(1).max(2000),
+					height: z.number().int().min(1).max(2000),
+				})
+				.optional(),
 		}),
 	)
 	.handler(async ({ data }) => {
+		if (!data.body && !data.gif)
+			throw new Error("Write something or pick a GIF.");
 		const { sb, user } = await requireUser();
 		const { data: comment, error } = await sb
 			.from("comments")
@@ -88,6 +103,9 @@ export const postComment = createServerFn({ method: "POST" })
 				game_id: data.gameId,
 				author_id: user.id,
 				body: data.body,
+				gif_id: data.gif?.id ?? null,
+				gif_width: data.gif?.width ?? null,
+				gif_height: data.gif?.height ?? null,
 			})
 			.select("id")
 			.single();
@@ -160,7 +178,7 @@ export const getMyMentions = createServerFn({ method: "GET" }).handler(
 		const { data, error } = await sb
 			.from("comment_mentions")
 			.select(
-				"comment_id, seen_at, created_at, comments(body, author_id, league_id, game_id, profiles(display_name), leagues(name), games(week, home_team, away_team))",
+				"comment_id, seen_at, created_at, comments(body, gif_id, author_id, league_id, game_id, profiles(display_name), leagues(name), games(week, home_team, away_team))",
 			)
 			.eq("user_id", user.id)
 			.order("created_at", { ascending: false })
@@ -168,6 +186,7 @@ export const getMyMentions = createServerFn({ method: "GET" }).handler(
 		if (error) throw new Error(error.message);
 		type Joined = {
 			body: string;
+			gif_id: string | null;
 			author_id: string;
 			league_id: string;
 			game_id: string;
@@ -185,6 +204,7 @@ export const getMyMentions = createServerFn({ method: "GET" }).handler(
 					seen: m.seen_at != null,
 					created_at: m.created_at,
 					body: c.body,
+					gif: c.gif_id != null,
 					author_id: c.author_id,
 					author_name: c.profiles?.display_name ?? "Someone",
 					league_id: c.league_id,

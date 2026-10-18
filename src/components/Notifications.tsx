@@ -143,6 +143,7 @@ export function NotificationsBell() {
 												</span>
 												<span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">
 													{n.body}
+													{n.gif && " + GIF"}
 												</span>
 												<span className="mt-0.5 block text-[11px] text-muted-foreground">
 													{n.league_name} · Week {n.week} ·{" "}
