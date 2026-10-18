@@ -25,6 +25,9 @@ import type {
 import type { Game, Team } from "#/lib/nfl/types";
 import { cn } from "#/lib/utils";
 import { gameDetailsQuery } from "#/server/games";
+import { CommentComposer, CommentList, useComments } from "./GameComments";
+
+export type SheetTab = "details" | "comments";
 
 interface Props {
 	game: Game;
@@ -32,6 +35,8 @@ interface Props {
 	onClose: () => void;
 	/** Home line frozen at kickoff for ATS leagues. */
 	lockedSpread?: number | null;
+	/** Which tab to open on, when the league has comments. */
+	tab?: SheetTab;
 }
 
 /** "GB -3" style text from the home team's line. */
@@ -53,12 +58,25 @@ function useIsDesktop() {
 }
 
 /**
- * Injuries, weather, line movement and form for one game. A bottom sheet on
- * phones (drag the handle down to close) and a side panel on wider screens.
- * Shows only ESPN data, never anyone's picks.
+ * Injuries, weather, line movement and form for one game, plus the league's
+ * comments on it. A bottom sheet on phones (drag the handle down to close) and
+ * a side panel on wider screens. Shows only ESPN data and comments, never
+ * anyone's picks.
  */
-export function GameDetailsSheet({ game, open, onClose, lockedSpread }: Props) {
+export function GameDetailsSheet({
+	game,
+	open,
+	onClose,
+	lockedSpread,
+	tab: openTab = "details",
+}: Props) {
 	const desktop = useIsDesktop();
+	const comments = useComments();
+	const [tab, setTab] = useState<SheetTab>(openTab);
+	useEffect(() => {
+		if (open) setTab(openTab);
+	}, [open, openTab]);
+	const showComments = !!comments && tab === "comments";
 	const drag = useDragControls();
 	const titleId = useId();
 	const closeRef = useRef<HTMLButtonElement>(null);
@@ -128,14 +146,80 @@ export function GameDetailsSheet({ game, open, onClose, lockedSpread }: Props) {
 							closeRef={closeRef}
 							onClose={onClose}
 						/>
-						<div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-1 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
-							<Body game={game} lockedSpread={lockedSpread} />
+						{comments && (
+							<Tabs
+								tab={tab}
+								onTab={setTab}
+								count={comments.byGame.get(game.id)?.length ?? 0}
+							/>
+						)}
+						<div
+							className={cn(
+								"flex-1 overflow-y-auto overscroll-contain px-5 pt-1",
+								showComments
+									? "pt-4"
+									: "pb-[calc(env(safe-area-inset-bottom)+1.5rem)]",
+							)}
+						>
+							{showComments ? (
+								<CommentList gameId={game.id} />
+							) : (
+								<Body game={game} lockedSpread={lockedSpread} />
+							)}
 						</div>
+						{showComments && <CommentComposer gameId={game.id} />}
 					</motion.div>
 				</div>
 			)}
 		</AnimatePresence>,
 		document.body,
+	);
+}
+
+function Tabs({
+	tab,
+	onTab,
+	count,
+}: {
+	tab: SheetTab;
+	onTab: (t: SheetTab) => void;
+	count: number;
+}) {
+	const tabs: { id: SheetTab; label: string }[] = [
+		{ id: "details", label: "Details" },
+		{ id: "comments", label: count ? `Comments · ${count}` : "Comments" },
+	];
+	return (
+		<div
+			role="tablist"
+			aria-label="Game sheet"
+			className="mx-5 flex shrink-0 rounded-full bg-muted p-1 text-sm font-semibold"
+		>
+			{tabs.map((t) => (
+				<button
+					key={t.id}
+					type="button"
+					role="tab"
+					aria-selected={tab === t.id}
+					onClick={() => onTab(t.id)}
+					className={cn(
+						"relative h-8 flex-1 rounded-full transition-colors",
+						tab === t.id
+							? "text-foreground"
+							: "text-muted-foreground hover:text-foreground",
+					)}
+				>
+					{tab === t.id && (
+						<motion.span
+							layoutId="game-sheet-tab"
+							className="absolute inset-0 rounded-full bg-background shadow-sm"
+							transition={{ type: "spring", stiffness: 500, damping: 38 }}
+						/>
+					)}
+					<span className="relative">{t.label}</span>
+				</button>
+			))}
+		</div>
 	);
 }
 

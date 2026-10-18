@@ -2,6 +2,7 @@ import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
 import { signOut } from "#/server/auth";
 import { Avatar } from "./Avatar";
 import { NewDot, useNewDot } from "./NewDot";
+import { NotificationsBell } from "./Notifications";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function AppHeader() {
@@ -23,17 +24,20 @@ export function AppHeader() {
 					<div className="flex gap-1 text-sm font-medium">
 						<Link
 							to="/leagues"
-							className="flex h-10 items-center rounded-full px-3 text-muted-foreground transition-colors hover:text-foreground"
+							className="flex h-10 items-center whitespace-nowrap rounded-full px-2.5 text-muted-foreground transition-colors hover:text-foreground sm:px-3"
 							activeProps={{ className: "bg-muted !text-foreground" }}
 						>
-							My leagues
+							{/* The bell needs the room on the narrowest phones. */}
+							<span className="min-[400px]:hidden">Leagues</span>
+							<span className="hidden min-[400px]:inline">My leagues</span>
 						</Link>
 					</div>
 				)}
 				{user ? (
-					<div className="ml-auto flex items-center gap-1 text-sm sm:gap-2">
+					<div className="ml-auto flex items-center gap-0.5 text-sm sm:gap-2">
 						{/* Phones are short on room here; the profile page has the setting too. */}
 						<ThemeToggle className="hidden sm:block" />
+						<NotificationsBell />
 						<Link
 							to="/profile"
 							aria-label="Your profile"
@@ -55,7 +59,7 @@ export function AppHeader() {
 								await router.invalidate();
 								router.navigate({ to: "/" });
 							}}
-							className="h-10 rounded-full border px-4 font-medium transition-colors hover:bg-muted"
+							className="h-10 whitespace-nowrap rounded-full border px-3 font-medium transition-colors hover:bg-muted sm:px-4"
 						>
 							Sign out
 						</button>

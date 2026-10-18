@@ -10,14 +10,15 @@ import {
 	X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { playUnlockSound } from "#/lib/lock-sound";
 import type { Game, PublicPicks, Team } from "#/lib/nfl/types";
 import type { PickOutcome } from "#/lib/scoring";
 import { accentColors, splitColors } from "#/lib/team-colors";
 import { useResolvedTheme } from "#/lib/theme";
 import { cn } from "#/lib/utils";
-import { GameDetailsSheet } from "./GameDetails";
+import { CommentsButton, useComments } from "./GameComments";
+import { GameDetailsSheet, type SheetTab } from "./GameDetails";
 import { useLockCelebration } from "./LockCelebration";
 import { NewDot, useNewDot } from "./NewDot";
 import { cardEffect, type EffectKind, PickEffect } from "./PickEffect";
@@ -79,6 +80,21 @@ export function GameCard({
 	points,
 }: Props) {
 	const [details, setDetails] = useState(false);
+	const [sheetTab, setSheetTab] = useState<SheetTab>("details");
+	const openSheet = (tab: SheetTab) => {
+		setSheetTab(tab);
+		setDetails(true);
+	};
+	// A mention notification links straight to this game's comments.
+	const comments = useComments();
+	const deepLinked = hasDetails && comments?.openGameId === game.id;
+	const onDeepLink = comments?.onOpened;
+	useEffect(() => {
+		if (!deepLinked) return;
+		setSheetTab("comments");
+		setDetails(true);
+		onDeepLink?.();
+	}, [deepLinked, onDeepLink]);
 	const detailsDot = useNewDot("game-details", hasDetails && newDetails);
 	const line = lineText === undefined ? game.spreadText : lineText;
 	const locked = game.state !== "pre";
@@ -140,7 +156,7 @@ export function GameCard({
 							type="button"
 							onClick={() => {
 								detailsDot.dismiss();
-								setDetails(true);
+								openSheet("details");
 							}}
 							aria-label={`${game.away.abbr} at ${game.home.abbr} details`}
 							title="Injuries, weather and line movement"
@@ -149,6 +165,13 @@ export function GameCard({
 							<Info className="size-4" aria-hidden />
 							<NewDot show={detailsDot.show} className="top-0 right-0" />
 						</button>
+					)}
+					{hasDetails && (
+						<CommentsButton
+							gameId={game.id}
+							label={`${game.away.abbr} at ${game.home.abbr}`}
+							onOpen={() => openSheet("comments")}
+						/>
 					)}
 				</span>
 			</div>
@@ -212,6 +235,7 @@ export function GameCard({
 				<GameDetailsSheet
 					game={game}
 					open={details}
+					tab={sheetTab}
 					onClose={() => setDetails(false)}
 					lockedSpread={lockedSpread}
 				/>
