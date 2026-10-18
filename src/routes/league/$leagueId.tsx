@@ -22,10 +22,11 @@ import {
 	Settings,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfidenceBoard } from "#/components/ConfidenceBoard";
 import { useOnline } from "#/components/ConnectionBanner";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
+import { CommentsProvider } from "#/components/GameComments";
 import { LeaveLeague } from "#/components/LeaveLeague";
 import type { EffectKind } from "#/components/PickEffect";
 import { type Picker, unknownPlayer } from "#/components/PickerAvatars";
@@ -71,15 +72,25 @@ import { myProfileQuery } from "#/server/profile";
 
 export const Route = createFileRoute("/league/$leagueId")({
 	// ?week=N browses an earlier week; no week means the current one.
-	validateSearch: (search: Record<string, unknown>): { week?: number } => {
+	// ?game=ID opens that game's comments (from a mention notification).
+	validateSearch: (
+		search: Record<string, unknown>,
+	): { week?: number; game?: string } => {
 		const week = Number(search.week);
-		return Number.isInteger(week) && week >= 1 && week <= 23 ? { week } : {};
+		const game =
+			typeof search.game === "string" || typeof search.game === "number"
+				? String(search.game)
+				: "";
+		return {
+			...(Number.isInteger(week) && week >= 1 && week <= 23 ? { week } : {}),
+			...(/^\d{1,12}$/.test(game) ? { game } : {}),
+		};
 	},
 	beforeLoad: ({ context, location }) => {
 		if (!context.user)
 			throw redirect({ to: "/login", search: { next: location.href } });
 	},
-	loaderDeps: ({ search }) => ({ week: search.week }),
+	loaderDeps: ({ search }) => ({ week: search.week, game: search.game }),
 	loader: async ({ context, params, deps }) => {
 		const current = await context.queryClient.ensureQueryData(
 			leagueWeekQuery(params.leagueId),
@@ -90,7 +101,7 @@ export const Route = createFileRoute("/league/$leagueId")({
 			throw redirect({
 				to: "/league/$leagueId",
 				params,
-				search: {},
+				search: deps.game ? { game: deps.game } : {},
 				replace: true,
 			});
 		await context.queryClient.ensureQueryData(
@@ -494,272 +505,299 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 		[userId, members, data.picks, games, shown, league],
 	);
 	const me = members.find((m) => m.user_id === userId);
+	const { game: openGameId } = Route.useSearch();
+	const navigate = Route.useNavigate();
+	const gameIds = useMemo(() => games.map((g) => g.id), [games]);
+	const clearOpenGame = useCallback(
+		() =>
+			navigate({
+				search: ({ game: _, ...rest }) => rest,
+				replace: true,
+				resetScroll: false,
+			}),
+		[navigate],
+	);
 
 	return (
-		<section
-			inert={offline}
-			className={cn(
-				"mt-6 transition-opacity",
-				(loading || offline) && "pointer-events-none opacity-60",
-			)}
+		<CommentsProvider
+			leagueId={leagueId}
+			userId={userId}
+			members={members}
+			gameIds={gameIds}
+			openGameId={openGameId}
+			onOpened={clearOpenGame}
 		>
-			<div className="flex items-end justify-between gap-3">
-				<WeekSwitcher leagueId={leagueId} shown={shown} thisWeek={thisWeek} />
-				<div className="flex items-center gap-3">
-					{card && me && <ShareWeek card={card} player={me} />}
-					{past ? (
-						<div className="flex items-baseline gap-2">
-							{/* Phones drop the label to leave room for the Share button. */}
-							<span
-								className={cn(
-									"text-xs font-semibold uppercase tracking-wider text-muted-foreground",
-									card && "hidden sm:inline",
-								)}
-							>
-								Your week
-							</span>
-							<span className="font-display text-2xl font-bold tabular-nums">
-								{myPoints}
-								<span className="text-base text-muted-foreground"> pts</span>
-							</span>
-						</div>
-					) : (
-						<div className="flex items-baseline gap-2">
-							{missed.length > 0 && (
-								<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-									{missed.length} missed
-								</span>
-							)}
-							<span className="font-display text-2xl font-bold tabular-nums">
-								{made}
-								<span className="text-muted-foreground">/{pickable}</span>
-							</span>
-						</div>
-					)}
-				</div>
-			</div>
-			{!past && (
-				<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-					<motion.div
-						className="h-full rounded-full bg-primary"
-						animate={{
-							width: `${pickable ? (made / pickable) * 100 : 0}%`,
-						}}
-						transition={{ type: "spring", stiffness: 120, damping: 20 }}
-					/>
-				</div>
-			)}
-			{error && <p className="mt-3 text-sm text-loss">{error}</p>}
-			{!past && (
-				<RookieChecklist
-					picks={mine.size}
-					hasLock={[...mine.values()].some((p) => p.is_lock)}
-					hasTiebreaker={!!tbGame && mine.get(tbGame.id)?.tiebreaker != null}
-				/>
-			)}
-			{past && (
-				<WeekResults
-					key={`results-${shown}`}
-					games={games}
-					members={members}
-					formers={data.formers}
-					picks={data.picks}
-					formerPicks={data.formerPicks}
-					settings={{
-						mode: league.mode,
-						pushValue: league.settings.pushValue,
-					}}
-					userId={userId}
-				/>
-			)}
-			{isConfidence && !past && (
-				<div className="sticky top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-20 mt-6 grid grid-cols-2 rounded-full border bg-card/90 p-1 text-sm font-semibold shadow-lg backdrop-blur-xl lg:hidden">
-					{(
-						[
-							["pick", "Pick winners"],
-							["rank", "Rank confidence"],
-						] as const
-					).map(([v, label]) => (
-						<button
-							key={v}
-							type="button"
-							onClick={() => switchView(v)}
-							className={cn(
-								"relative h-10 rounded-full transition-colors",
-								view === v
-									? "text-primary-foreground"
-									: "text-muted-foreground",
-							)}
-						>
-							{view === v && (
-								<motion.span
-									layoutId="confidence-view"
-									className="absolute inset-0 rounded-full bg-primary"
-									transition={{ type: "spring", stiffness: 400, damping: 32 }}
-								/>
-							)}
-							<span className="relative">{label}</span>
-						</button>
-					))}
-				</div>
-			)}
-			<div
-				ref={viewsTop}
-				key={`games-${shown}`}
+			<section
+				inert={offline}
 				className={cn(
-					"scroll-mt-32",
-					isConfidence &&
-						!past &&
-						"lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6",
+					"mt-6 transition-opacity",
+					(loading || offline) && "pointer-events-none opacity-60",
 				)}
 			>
-				<div
-					className={cn(
-						"mt-6 grid gap-3 sm:gap-4 md:grid-cols-2",
-						isConfidence && !past && "lg:grid-cols-1",
-						isConfidence && !past && view === "rank" && "hidden lg:grid",
-					)}
-				>
-					{games.map((g, i) => {
-						const myPick = mine.get(g.id);
-						const locked = g.state !== "pre";
-						const others: Record<string, Picker[]> = {};
-						if (locked) {
-							for (const p of data.picks) {
-								if (p.game_id !== g.id || p.user_id === userId) continue;
-								others[p.team] = [
-									...(others[p.team] ?? []),
-									{
-										id: p.user_id,
-										profile: profiles.get(p.user_id) ?? unknownPlayer,
-										lock: p.is_lock,
-									},
-								];
-							}
-						}
-						const fade = fadedThePublic(
-							g,
-							// Prefer the split saved at lock; fall back to the live feed.
-							g.crowdHomePct != null
-								? { home: g.crowdHomePct, away: 100 - g.crowdHomePct }
-								: g.publicPicks,
-							data.picks,
-							league.mode,
-						);
-						const myResult = myPick && {
-							pick: {
-								gameId: g.id,
-								team: myPick.team,
-								confidence: myPick.confidence,
-							},
-							game: toResult(g),
-						};
-						return (
-							<GameCard
-								key={g.id}
-								game={g}
-								outcome={
-									myResult &&
-									pickOutcome(myResult.pick, myResult.game, league.mode)
-								}
-								points={
-									myResult &&
-									scorePick(myResult.pick, myResult.game, {
-										mode: league.mode,
-										pushValue: league.settings.pushValue,
-									})
-								}
-								faded={
-									fade && {
-										crowd: fade.crowd,
-										// You first, then everyone else by name.
-										names: [...fade.userIds]
-											.sort(
-												(a, b) => Number(b === userId) - Number(a === userId),
-											)
-											.map((id) =>
-												id === userId ? "You" : (names.get(id) ?? "Player"),
-											),
-									}
-								}
-								picked={myPick?.team}
-								onPick={(team) => choose(g, team)}
-								lineText={league.mode === "spread" ? lineText(g) : g.spreadText}
-								lockedSpread={league.mode === "spread" ? g.lockedSpread : null}
-								newDetails={i === 0}
-								others={others}
-								note={enteredNote(
-									data.picks.filter(
-										(p) =>
-											p.game_id === g.id && (locked || p.user_id === userId),
-									),
-									userId,
-									names,
+				<div className="flex items-end justify-between gap-3">
+					<WeekSwitcher leagueId={leagueId} shown={shown} thisWeek={thisWeek} />
+					<div className="flex items-center gap-3">
+						{card && me && <ShareWeek card={card} player={me} />}
+						{past ? (
+							<div className="flex items-baseline gap-2">
+								{/* Phones drop the label to leave room for the Share button. */}
+								<span
+									className={cn(
+										"text-xs font-semibold uppercase tracking-wider text-muted-foreground",
+										card && "hidden sm:inline",
+									)}
+								>
+									Your week
+								</span>
+								<span className="font-display text-2xl font-bold tabular-nums">
+									{myPoints}
+									<span className="text-base text-muted-foreground"> pts</span>
+								</span>
+							</div>
+						) : (
+							<div className="flex items-baseline gap-2">
+								{missed.length > 0 && (
+									<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+										{missed.length} missed
+									</span>
 								)}
-								lock={
-									myPick && (!lockInPlay || myPick.is_lock)
-										? {
-												on: myPick.is_lock,
-												onToggle: () =>
-													lock.mutate({ gameId: g.id, on: !myPick.is_lock }),
-											}
-										: null
-								}
-								effect={effects.playing[g.id]}
-								onEffectDone={() => effects.done(g.id)}
-								footer={
-									isConfidence && (
-										<ConfidenceFooter
-											value={myPick?.confidence ?? null}
-											picked={!!myPick}
-											locked={locked}
-											onRank={() => switchView("rank")}
-										/>
-									)
-								}
-							/>
-						);
-					})}
-				</div>
-				{isConfidence && !past && (
-					<ConfidenceBoard
-						games={games}
-						picks={mine}
-						missed={missed.length}
-						onRerank={(changes) => confidence.mutate(changes)}
-						onLock={(gameId, on) => lock.mutate({ gameId, on })}
-						className={cn(
-							"mt-6 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto",
-							view === "pick" && "hidden lg:block",
+								<span className="font-display text-2xl font-bold tabular-nums">
+									{made}
+									<span className="text-muted-foreground">/{pickable}</span>
+								</span>
+							</div>
 						)}
+					</div>
+				</div>
+				{!past && (
+					<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+						<motion.div
+							className="h-full rounded-full bg-primary"
+							animate={{
+								width: `${pickable ? (made / pickable) * 100 : 0}%`,
+							}}
+							transition={{ type: "spring", stiffness: 120, damping: 20 }}
+						/>
+					</div>
+				)}
+				{error && <p className="mt-3 text-sm text-loss">{error}</p>}
+				{!past && (
+					<RookieChecklist
+						picks={mine.size}
+						hasLock={[...mine.values()].some((p) => p.is_lock)}
+						hasTiebreaker={!!tbGame && mine.get(tbGame.id)?.tiebreaker != null}
 					/>
 				)}
-			</div>
-			{tbGame && (
-				<Tiebreaker
-					game={tbGame}
-					picked={mine.has(tbGame.id)}
-					guess={mine.get(tbGame.id)?.tiebreaker ?? null}
-					others={data.picks.flatMap((p) =>
-						p.game_id === tbGame.id &&
-						p.user_id !== userId &&
-						p.tiebreaker != null
-							? [
-									{
-										userId: p.user_id,
-										name: names.get(p.user_id) ?? "Player",
-										guess: p.tiebreaker,
-									},
-								]
-							: [],
+				{past && (
+					<WeekResults
+						key={`results-${shown}`}
+						games={games}
+						members={members}
+						formers={data.formers}
+						picks={data.picks}
+						formerPicks={data.formerPicks}
+						settings={{
+							mode: league.mode,
+							pushValue: league.settings.pushValue,
+						}}
+						userId={userId}
+					/>
+				)}
+				{isConfidence && !past && (
+					<div className="sticky top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-20 mt-6 grid grid-cols-2 rounded-full border bg-card/90 p-1 text-sm font-semibold shadow-lg backdrop-blur-xl lg:hidden">
+						{(
+							[
+								["pick", "Pick winners"],
+								["rank", "Rank confidence"],
+							] as const
+						).map(([v, label]) => (
+							<button
+								key={v}
+								type="button"
+								onClick={() => switchView(v)}
+								className={cn(
+									"relative h-10 rounded-full transition-colors",
+									view === v
+										? "text-primary-foreground"
+										: "text-muted-foreground",
+								)}
+							>
+								{view === v && (
+									<motion.span
+										layoutId="confidence-view"
+										className="absolute inset-0 rounded-full bg-primary"
+										transition={{ type: "spring", stiffness: 400, damping: 32 }}
+									/>
+								)}
+								<span className="relative">{label}</span>
+							</button>
+						))}
+					</div>
+				)}
+				<div
+					ref={viewsTop}
+					key={`games-${shown}`}
+					className={cn(
+						"scroll-mt-32",
+						isConfidence &&
+							!past &&
+							"lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6",
 					)}
-					saving={tiebreaker.isPending}
-					onSave={(points) => tiebreaker.mutate({ gameId: tbGame.id, points })}
-					newDot={!past}
-				/>
-			)}
-			<PublicPicksNote games={games} />
-		</section>
+				>
+					<div
+						className={cn(
+							"mt-6 grid gap-3 sm:gap-4 md:grid-cols-2",
+							isConfidence && !past && "lg:grid-cols-1",
+							isConfidence && !past && view === "rank" && "hidden lg:grid",
+						)}
+					>
+						{games.map((g, i) => {
+							const myPick = mine.get(g.id);
+							const locked = g.state !== "pre";
+							const others: Record<string, Picker[]> = {};
+							if (locked) {
+								for (const p of data.picks) {
+									if (p.game_id !== g.id || p.user_id === userId) continue;
+									others[p.team] = [
+										...(others[p.team] ?? []),
+										{
+											id: p.user_id,
+											profile: profiles.get(p.user_id) ?? unknownPlayer,
+											lock: p.is_lock,
+										},
+									];
+								}
+							}
+							const fade = fadedThePublic(
+								g,
+								// Prefer the split saved at lock; fall back to the live feed.
+								g.crowdHomePct != null
+									? { home: g.crowdHomePct, away: 100 - g.crowdHomePct }
+									: g.publicPicks,
+								data.picks,
+								league.mode,
+							);
+							const myResult = myPick && {
+								pick: {
+									gameId: g.id,
+									team: myPick.team,
+									confidence: myPick.confidence,
+								},
+								game: toResult(g),
+							};
+							return (
+								<GameCard
+									key={g.id}
+									game={g}
+									outcome={
+										myResult &&
+										pickOutcome(myResult.pick, myResult.game, league.mode)
+									}
+									points={
+										myResult &&
+										scorePick(myResult.pick, myResult.game, {
+											mode: league.mode,
+											pushValue: league.settings.pushValue,
+										})
+									}
+									faded={
+										fade && {
+											crowd: fade.crowd,
+											// You first, then everyone else by name.
+											names: [...fade.userIds]
+												.sort(
+													(a, b) => Number(b === userId) - Number(a === userId),
+												)
+												.map((id) =>
+													id === userId ? "You" : (names.get(id) ?? "Player"),
+												),
+										}
+									}
+									picked={myPick?.team}
+									onPick={(team) => choose(g, team)}
+									lineText={
+										league.mode === "spread" ? lineText(g) : g.spreadText
+									}
+									lockedSpread={
+										league.mode === "spread" ? g.lockedSpread : null
+									}
+									newDetails={i === 0}
+									others={others}
+									note={enteredNote(
+										data.picks.filter(
+											(p) =>
+												p.game_id === g.id && (locked || p.user_id === userId),
+										),
+										userId,
+										names,
+									)}
+									lock={
+										myPick && (!lockInPlay || myPick.is_lock)
+											? {
+													on: myPick.is_lock,
+													onToggle: () =>
+														lock.mutate({ gameId: g.id, on: !myPick.is_lock }),
+												}
+											: null
+									}
+									effect={effects.playing[g.id]}
+									onEffectDone={() => effects.done(g.id)}
+									footer={
+										isConfidence && (
+											<ConfidenceFooter
+												value={myPick?.confidence ?? null}
+												picked={!!myPick}
+												locked={locked}
+												onRank={() => switchView("rank")}
+											/>
+										)
+									}
+								/>
+							);
+						})}
+					</div>
+					{isConfidence && !past && (
+						<ConfidenceBoard
+							games={games}
+							picks={mine}
+							missed={missed.length}
+							onRerank={(changes) => confidence.mutate(changes)}
+							onLock={(gameId, on) => lock.mutate({ gameId, on })}
+							className={cn(
+								"mt-6 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto",
+								view === "pick" && "hidden lg:block",
+							)}
+						/>
+					)}
+				</div>
+				{tbGame && (
+					<Tiebreaker
+						game={tbGame}
+						picked={mine.has(tbGame.id)}
+						guess={mine.get(tbGame.id)?.tiebreaker ?? null}
+						others={data.picks.flatMap((p) =>
+							p.game_id === tbGame.id &&
+							p.user_id !== userId &&
+							p.tiebreaker != null
+								? [
+										{
+											userId: p.user_id,
+											name: names.get(p.user_id) ?? "Player",
+											guess: p.tiebreaker,
+										},
+									]
+								: [],
+						)}
+						saving={tiebreaker.isPending}
+						onSave={(points) =>
+							tiebreaker.mutate({ gameId: tbGame.id, points })
+						}
+						newDot={!past}
+					/>
+				)}
+				<PublicPicksNote games={games} />
+			</section>
+		</CommentsProvider>
 	);
 }
 

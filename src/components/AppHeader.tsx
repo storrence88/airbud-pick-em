@@ -2,6 +2,7 @@ import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
 import { signOut } from "#/server/auth";
 import { Avatar } from "./Avatar";
 import { NewDot, useNewDot } from "./NewDot";
+import { NotificationsBell } from "./Notifications";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function AppHeader() {
@@ -34,6 +35,7 @@ export function AppHeader() {
 					<div className="ml-auto flex items-center gap-1 text-sm sm:gap-2">
 						{/* Phones are short on room here; the profile page has the setting too. */}
 						<ThemeToggle className="hidden sm:block" />
+						<NotificationsBell />
 						<Link
 							to="/profile"
 							aria-label="Your profile"
