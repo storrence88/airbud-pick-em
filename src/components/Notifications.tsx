@@ -89,7 +89,7 @@ export function NotificationsBell() {
 						animate={{ opacity: 1, y: 0, scale: 1 }}
 						exit={{ opacity: 0, y: -6, scale: 0.97 }}
 						transition={{ type: "spring", stiffness: 500, damping: 34 }}
-						className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+3.75rem)] z-40 origin-top overflow-hidden rounded-xl border bg-card text-card-foreground shadow-2xl sm:absolute sm:inset-x-auto sm:top-12 sm:right-0 sm:w-96 sm:origin-top-right"
+						className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+3.75rem)] z-40 origin-top overflow-hidden rounded-xl border bg-card text-card-foreground shadow-2xl shadow-black/30 ring-1 ring-foreground/5 sm:absolute sm:inset-x-auto sm:top-12 sm:right-0 sm:w-96 sm:origin-top-right"
 					>
 						<div className="flex items-center justify-between border-b px-4 py-2.5">
 							<h2 className="text-sm font-semibold">Mentions</h2>
