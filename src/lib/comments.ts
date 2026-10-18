@@ -11,6 +11,36 @@ export function isReaction(s: string): s is Reaction {
 	return (REACTIONS as readonly string[]).includes(s);
 }
 
+/** Custom emoji names, Slack style: lowercase letters, digits, - and _. */
+export const EMOJI_NAME = /^[a-z0-9_-]{2,24}$/;
+/** Largest custom emoji image we'll upload, in bytes. */
+export const MAX_EMOJI_BYTES = 512 * 1024;
+
+/** A reaction with a league's custom emoji is stored as ":name:". */
+export const customEmoji = (name: string) => `:${name}:`;
+
+/** The custom emoji name in a stored reaction, or null for a regular emoji. */
+export function customEmojiName(emoji: string) {
+	const m = /^:([a-z0-9_-]{2,24}):$/.exec(emoji);
+	return m ? m[1] : null;
+}
+
+/** A reaction we accept: one of the quick six or a custom ":name:". */
+export const isValidReaction = (s: string) =>
+	isReaction(s) || customEmojiName(s) != null;
+
+/** A custom emoji name suggested from an uploaded file's name. */
+export function emojiNameFromFile(filename: string) {
+	return filename
+		.replace(/\.[^.]+$/, "")
+		.toLowerCase()
+		.replace(/[\s.]+/g, "_")
+		.replace(/[^a-z0-9_-]/g, "")
+		.replace(/_+/g, "_")
+		.replace(/^[_-]+|[_-]+$/g, "")
+		.slice(0, 24);
+}
+
 export interface Mentionable {
 	user_id: string;
 	display_name: string;

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	customEmojiName,
+	emojiNameFromFile,
 	groupReactions,
+	isValidReaction,
 	mentionedIds,
 	mentionQuery,
 	parseMentions,
@@ -79,5 +82,25 @@ describe("timeAgo", () => {
 		expect(timeAgo("2026-10-18T11:55:00Z", now)).toBe("5m");
 		expect(timeAgo("2026-10-18T09:00:00Z", now)).toBe("3h");
 		expect(timeAgo("2026-10-16T12:00:00Z", now)).toBe("2d");
+	});
+});
+
+describe("custom emoji", () => {
+	it("reads the name out of a stored reaction", () => {
+		expect(customEmojiName(":bills_mafia:")).toBe("bills_mafia");
+		expect(customEmojiName("🔥")).toBeNull();
+		expect(customEmojiName(":Bad Name:")).toBeNull();
+	});
+
+	it("accepts the quick six and custom names only", () => {
+		expect(isValidReaction("🐐")).toBe(true);
+		expect(isValidReaction(":nate-cries:")).toBe(true);
+		expect(isValidReaction("🍕")).toBe(false);
+		expect(isValidReaction(":x:")).toBe(false);
+	});
+
+	it("suggests a name from the file name", () => {
+		expect(emojiNameFromFile("Nate Crying (1).PNG")).toBe("nate_crying_1");
+		expect(emojiNameFromFile("bills.mafia.gif")).toBe("bills_mafia");
 	});
 });
