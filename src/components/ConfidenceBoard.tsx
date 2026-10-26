@@ -1,10 +1,13 @@
 import {
+	Check,
 	ChevronDown,
 	ChevronUp,
+	Equal,
 	GripVertical,
 	Lock,
 	LockKeyhole,
 	LockKeyholeOpen,
+	X,
 } from "lucide-react";
 import {
 	AnimatePresence,
@@ -29,7 +32,9 @@ import {
 } from "#/lib/confidence";
 import { playUnlockSound } from "#/lib/lock-sound";
 import type { Game, Team } from "#/lib/nfl/types";
+import { type PickOutcome, pickOutcome } from "#/lib/scoring";
 import { cn } from "#/lib/utils";
+import { toResult } from "#/lib/week-results";
 import { useLockCelebration } from "./LockCelebration";
 
 interface Props {
@@ -280,21 +285,40 @@ export function ConfidenceBoard({
 							const game = byId.get(p.gameId);
 							const team = picks.get(p.gameId)?.team;
 							if (!game || !team) return null;
+							const outcome = pickOutcome(
+								{ gameId: game.id, team },
+								toResult(game),
+								"confidence",
+							);
+							const settled = outcome === "pending" ? null : outcome;
 							return (
 								<li
 									key={p.gameId}
 									className="flex items-center gap-3 rounded-md bg-muted/60 px-3 py-1.5 text-sm text-muted-foreground"
 								>
-									<span className="w-7 text-center font-display text-lg font-bold tabular-nums">
+									<span
+										className={cn(
+											"w-7 text-center font-display text-lg font-bold tabular-nums",
+											settled === "win" && "text-win",
+											settled &&
+												settled !== "win" &&
+												"line-through decoration-2 opacity-60",
+										)}
+									>
 										{p.confidence}
 									</span>
 									<Matchup game={game} team={team} />
-									{lockId === p.gameId && (
-										<LockKeyhole
-											className="ml-auto size-4 shrink-0 text-amber-600 dark:text-amber-300"
-											aria-label="Lock of the week"
-										/>
-									)}
+									<span className="ml-auto flex shrink-0 items-center gap-2.5">
+										{lockId === p.gameId && (
+											<LockKeyhole
+												className="size-4 text-amber-600 dark:text-amber-300"
+												aria-label="Lock of the week"
+											/>
+										)}
+										{settled && (
+											<Result outcome={settled} points={p.confidence ?? 0} />
+										)}
+									</span>
 								</li>
 							);
 						})}
@@ -470,6 +494,44 @@ function LockButton({
 				<Icon className={cn("size-[18px]", on && "fill-amber-400/30")} />
 			</motion.span>
 		</button>
+	);
+}
+
+const RESULT_TEXT = { win: "Won", loss: "Lost", push: "Push" } as const;
+
+/** "+14" and a green check, or a red X / gray equals, like finished game cards. */
+function Result({
+	outcome,
+	points,
+}: {
+	outcome: Exclude<PickOutcome, "pending">;
+	points: number;
+}) {
+	const Icon = outcome === "loss" ? X : outcome === "push" ? Equal : Check;
+	return (
+		<span
+			className="flex items-center gap-1.5"
+			title={`${RESULT_TEXT[outcome]}${outcome === "win" ? ` · +${points}` : ""}`}
+		>
+			{outcome === "win" && (
+				<span className="text-xs font-semibold tabular-nums text-win">
+					+{points}
+				</span>
+			)}
+			<span
+				className={cn(
+					"grid size-5 place-items-center rounded-full text-white",
+					outcome === "win"
+						? "bg-win"
+						: outcome === "loss"
+							? "bg-loss"
+							: "bg-zinc-500",
+				)}
+			>
+				<Icon className="size-3" strokeWidth={3} aria-hidden />
+				<span className="sr-only">{RESULT_TEXT[outcome]}</span>
+			</span>
+		</span>
 	);
 }
 
