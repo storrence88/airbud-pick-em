@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ByeTeams } from "#/components/ByeTeams";
 import { ConfidenceBoard } from "#/components/ConfidenceBoard";
 import { useOnline } from "#/components/ConnectionBanner";
 import { GameCard, PublicPicksNote } from "#/components/GameCard";
@@ -795,6 +796,7 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 						newDot={!past}
 					/>
 				)}
+				<ByeTeams games={games} />
 				<PublicPicksNote games={games} />
 			</section>
 		</CommentsProvider>
