@@ -33,6 +33,7 @@ import {
 import { playUnlockSound } from "#/lib/lock-sound";
 import type { Game, Team } from "#/lib/nfl/types";
 import { type PickOutcome, pickOutcome } from "#/lib/scoring";
+import { accentColors } from "#/lib/team-colors";
 import { cn } from "#/lib/utils";
 import { toResult } from "#/lib/week-results";
 import { useLockCelebration } from "./LockCelebration";
@@ -224,7 +225,7 @@ export function ConfidenceBoard({
 				axis="y"
 				values={order}
 				onReorder={setOrder}
-				className="mt-4 grid gap-2"
+				className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-2"
 			>
 				{order.map((id, i) => {
 					const game = byId.get(id);
@@ -414,7 +415,7 @@ function Row({
 					className="size-8 shrink-0"
 				/>
 			)}
-			<Matchup game={game} team={team} />
+			<Matchup game={game} team={team} details />
 			{onLock && (
 				<LockButton
 					on={isLock}
@@ -535,14 +536,86 @@ function Result({
 	);
 }
 
-function Matchup({ game, team }: { game: Game; team: string }) {
-	const opponent = team === game.home.abbr ? game.away : game.home;
-	const picked = team === game.home.abbr ? game.home : game.away;
+function Matchup({
+	game,
+	team,
+	details = false,
+}: {
+	game: Game;
+	team: string;
+	/** Adds the picked team's line and a hairline ESPN pick split. */
+	details?: boolean;
+}) {
+	const home = team === game.home.abbr;
+	const opponent = home ? game.away : game.home;
+	const picked = home ? game.home : game.away;
+	const line = details ? teamLine(game.spread, home) : null;
+	const share = details ? game.publicPicks?.[home ? "home" : "away"] : null;
 	return (
-		<span className="min-w-0 leading-tight">
+		<span className={cn("min-w-0 leading-tight", details && "flex-1")}>
 			<span className="block truncate font-semibold">{picked.shortName}</span>
-			<span className="block truncate text-xs text-muted-foreground">
-				{team === game.home.abbr ? "vs" : "at"} {opponent.shortName}
+			{/* The opponent gives way before the line does on narrow rows. */}
+			<span className="flex text-xs text-muted-foreground">
+				<span className="truncate">
+					{home ? "vs" : "at"} {opponent.shortName}
+				</span>
+				{line && (
+					<span
+						className="shrink-0 whitespace-pre tabular-nums"
+						title={`${picked.shortName} ${line}`}
+					>
+						{" · "}
+						{line}
+					</span>
+				)}
+			</span>
+			{share != null && <PickShare game={game} home={home} share={share} />}
+		</span>
+	);
+}
+
+/** "−3.5" for a favorite, "+3.5" for an underdog, "PK" for a pick'em. */
+function teamLine(homeSpread: number | null, home: boolean) {
+	if (homeSpread == null) return null;
+	const n = home ? homeSpread : -homeSpread;
+	if (n === 0) return "PK";
+	return `${n < 0 ? "−" : "+"}${Math.abs(n)}`;
+}
+
+/** A hairline of how much of ESPN backs your team, in its color. */
+function PickShare({
+	game,
+	home,
+	share,
+}: {
+	game: Game;
+	home: boolean;
+	share: number;
+}) {
+	const team = home ? game.home : game.away;
+	const light = accentColors(team, "light").accent;
+	const dark = accentColors(team, "dark").accent;
+	const name = team.shortName;
+	return (
+		<span
+			className="mt-1 flex max-w-44 items-center gap-1.5"
+			title={`${share}% of ESPN NFL Pick'em players picked ${name}`}
+		>
+			<span
+				className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
+				style={
+					{ "--pick-light": light, "--pick-dark": dark } as React.CSSProperties
+				}
+			>
+				<motion.span
+					className="block h-full rounded-full bg-(--pick-light) opacity-80 dark:bg-(--pick-dark)"
+					initial={{ width: 0 }}
+					animate={{ width: `${share}%` }}
+					transition={{ type: "spring", stiffness: 120, damping: 20 }}
+				/>
+			</span>
+			<span className="text-[10px] font-medium tabular-nums text-muted-foreground">
+				{share}%<span className="sr-only"> of ESPN picked {name}</span>
 			</span>
 		</span>
 	);
