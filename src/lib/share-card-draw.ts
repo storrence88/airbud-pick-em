@@ -4,7 +4,13 @@
 
 import { teamByAbbr } from "./nfl/teams";
 import { initials } from "./profile";
-import { type CardPick, lockText, type ShareCard } from "./share-card";
+import {
+	type CardPick,
+	type GroupShare,
+	lockText,
+	type ShareCard,
+	type ShareStatus,
+} from "./share-card";
 import { accentColors } from "./team-colors";
 
 export const CARD_WIDTH = 1080;
@@ -23,6 +29,7 @@ const FG = "#f1f2f5";
 const MUTED = "#9aa1ad";
 const WIN = "#3fbf6e";
 const LOSS = "#f05a4f";
+const LIVE = "#5aa9f5";
 /** The app's green, used when there's no favorite team. */
 const PRIMARY = "#4fd27a";
 
@@ -163,23 +170,35 @@ function drawPick(
 	showConfidence: boolean,
 ) {
 	roundRect(ctx, x, y, w, h, 18);
-	if (p.outcome === "missed") {
-		ctx.setLineDash([10, 8]);
-		ctx.strokeStyle = "#ffffff26";
-		ctx.lineWidth = 2;
-		ctx.stroke();
-		ctx.setLineDash([]);
+	if (p.outcome === "missed" || p.outcome === "hidden") {
+		const hidden = p.outcome === "hidden";
+		if (hidden) {
+			ctx.fillStyle = "#ffffff0d";
+			ctx.fill();
+		} else {
+			ctx.setLineDash([10, 8]);
+			ctx.strokeStyle = "#ffffff26";
+			ctx.lineWidth = 2;
+			ctx.stroke();
+			ctx.setLineDash([]);
+		}
 		ctx.fillStyle = "#ffffff40";
 		ctx.font = `500 26px ${SANS}`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		ctx.fillText("Missed", x + w / 2, y + h / 2 + 1);
+		ctx.fillText(hidden ? "Hidden" : "Missed", x + w / 2, y + h / 2 + 1);
 		ctx.textAlign = "left";
 		ctx.textBaseline = "alphabetic";
 		return;
 	}
 	const tint =
-		p.outcome === "win" ? WIN : p.outcome === "loss" ? LOSS : "#ffffff";
+		p.outcome === "win"
+			? WIN
+			: p.outcome === "loss"
+				? LOSS
+				: p.outcome === "live"
+					? LIVE
+					: "#ffffff";
 	ctx.fillStyle = `${tint}${p.outcome === "push" ? "14" : "1f"}`;
 	ctx.fill();
 	ctx.strokeStyle = `${tint}${p.isLock ? "b3" : "33"}`;
@@ -198,7 +217,11 @@ function drawPick(
 
 	ctx.globalAlpha = p.outcome === "loss" ? 0.6 : 1;
 	ctx.fillStyle =
-		p.outcome === "win" ? FG : p.outcome === "loss" ? LOSS : MUTED;
+		p.outcome === "win" || p.outcome === "live"
+			? FG
+			: p.outcome === "loss"
+				? LOSS
+				: MUTED;
 	ctx.font = `600 40px ${DISPLAY}`;
 	ctx.textBaseline = "middle";
 	ctx.fillText(p.team, x + 30, y + h / 2 + 2);
@@ -221,6 +244,52 @@ function drawPick(
 	ctx.globalAlpha = 1;
 }
 
+/** Background, wordmark, the week, the league and where the week stands. Returns the baseline of the league line. */
+function drawHeader(
+	ctx: CanvasRenderingContext2D,
+	W: number,
+	H: number,
+	accent: string,
+	card: { week: number; league: string; status: ShareStatus },
+) {
+	// Background: dark, with a soft glow in the accent color up top.
+	ctx.fillStyle = BG;
+	ctx.fillRect(0, 0, W, H);
+	const glow = ctx.createRadialGradient(W / 2, -160, 40, W / 2, -160, 1000);
+	glow.addColorStop(0, `${accent}55`);
+	glow.addColorStop(1, `${accent}00`);
+	ctx.fillStyle = glow;
+	ctx.fillRect(0, 0, W, H);
+
+	let y = PAD + 44;
+	ctx.font = `700 44px ${DISPLAY}`;
+	ctx.fillStyle = FG;
+	ctx.fillText("PICK", PAD, y);
+	const pw = ctx.measureText("PICK").width;
+	ctx.fillStyle = PRIMARY;
+	ctx.fillText("'EM", PAD + pw, y);
+	ctx.textAlign = "right";
+	ctx.fillStyle = FG;
+	ctx.font = `600 44px ${DISPLAY}`;
+	ctx.fillText(`WEEK ${card.week}`, W - PAD, y);
+	y += 50;
+	// Where the week stands, under the week: a dot while games are on.
+	ctx.font = `600 30px ${DISPLAY}`;
+	const label = card.status.label.toUpperCase();
+	const lw = ctx.measureText(label).width;
+	ctx.fillStyle = card.status.kind === "live" ? LIVE : MUTED;
+	ctx.fillText(label, W - PAD, y);
+	if (card.status.kind === "live") {
+		ctx.beginPath();
+		ctx.arc(W - PAD - lw - 20, y - 11, 8, 0, Math.PI * 2);
+		ctx.fill();
+	}
+	ctx.textAlign = "left";
+	ctx.fillStyle = MUTED;
+	fitText(ctx, card.league, PAD, y, W - PAD * 2 - lw - 60, 500, 32, SANS);
+	return y;
+}
+
 export function drawShareCard(
 	ctx: CanvasRenderingContext2D,
 	card: ShareCard,
@@ -233,31 +302,7 @@ export function drawShareCard(
 		? accentColors(fav)
 		: { accent: PRIMARY, foreground: BG };
 
-	// Background: dark, with a soft glow in your team's color up top.
-	ctx.fillStyle = BG;
-	ctx.fillRect(0, 0, W, H);
-	const glow = ctx.createRadialGradient(W / 2, -160, 40, W / 2, -160, 1000);
-	glow.addColorStop(0, `${accent}55`);
-	glow.addColorStop(1, `${accent}00`);
-	ctx.fillStyle = glow;
-	ctx.fillRect(0, 0, W, H);
-
-	// Header: wordmark and the week.
-	let y = PAD + 44;
-	ctx.font = `700 44px ${DISPLAY}`;
-	ctx.fillStyle = FG;
-	ctx.fillText("PICK", PAD, y);
-	const pw = ctx.measureText("PICK").width;
-	ctx.fillStyle = PRIMARY;
-	ctx.fillText("'EM", PAD + pw, y);
-	ctx.textAlign = "right";
-	ctx.fillStyle = FG;
-	ctx.font = `600 44px ${DISPLAY}`;
-	ctx.fillText(`WEEK ${card.week}`, W - PAD, y);
-	ctx.textAlign = "left";
-	y += 50;
-	ctx.fillStyle = MUTED;
-	fitText(ctx, card.league, PAD, y, W - PAD * 2, 500, 32, SANS);
+	let y = drawHeader(ctx, W, H, accent, card);
 
 	// Player.
 	y += 70;
@@ -362,6 +407,7 @@ export function drawShareCard(
 	const key = [
 		card.lock && "★ Lock of the Week",
 		showConfidence && "numbers are confidence",
+		card.hidden > 0 && "hidden until kickoff",
 	].filter(Boolean);
 	if (key.length) {
 		ctx.fillStyle = "#ffffff30";
@@ -385,5 +431,118 @@ export function loadPhoto(
 		img.onerror = () => resolve(null);
 		img.src = url;
 		setTimeout(() => resolve(null), 4000);
+	});
+}
+
+export const GROUP_ROW = 116;
+
+/** The group card grows with the league: a header, one row per player, a footer. */
+export function groupCardHeight(rows: number) {
+	return Math.max(1080, 300 + rows * GROUP_ROW + 170);
+}
+
+/**
+ * The whole league's week on one image: place, avatar, name, points, and a
+ * thin bar toward the most each player can still reach.
+ */
+export function drawGroupCard(
+	ctx: CanvasRenderingContext2D,
+	group: GroupShare,
+	players: Map<string, CardPlayer>,
+) {
+	const W = CARD_WIDTH;
+	const H = groupCardHeight(group.rows.length);
+	const top = drawHeader(ctx, W, H, PRIMARY, group) + 70;
+	const confidence = group.mode === "confidence";
+	const scale = Math.max(1, ...group.rows.map((r) => r.max ?? r.points));
+
+	group.rows.forEach((r, i) => {
+		const y = top + i * GROUP_ROW;
+		const mid = y + GROUP_ROW / 2;
+		if (i > 0) {
+			ctx.fillStyle = "#ffffff14";
+			ctx.fillRect(PAD, y, W - PAD * 2, 1);
+		}
+		const player = players.get(r.userId);
+		const fav = teamByAbbr(player?.favorite_team);
+		const ring = fav ? accentColors(fav).accent : null;
+
+		// Place, or a crown for the winner.
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.fillStyle = r.winner ? "#f5c451" : MUTED;
+		ctx.font = `600 ${r.winner ? 44 : 40}px ${DISPLAY}`;
+		ctx.fillText(r.winner ? "♛" : String(r.place), PAD + 22, mid + 2);
+		ctx.textAlign = "left";
+		ctx.textBaseline = "alphabetic";
+
+		const size = 76;
+		const ax = PAD + 70;
+		if (player) drawAvatar(ctx, player, ax, mid - size / 2, size, ring);
+
+		// Score on the right: points (or record), and the max under it.
+		const right = W - PAD;
+		const score = confidence ? String(r.points) : r.record;
+		ctx.textAlign = "right";
+		ctx.fillStyle = FG;
+		ctx.font = `700 54px ${DISPLAY}`;
+		ctx.fillText(score, right, r.max != null ? mid + 6 : mid + 20);
+		const sw = ctx.measureText(score).width;
+		if (r.max != null) {
+			ctx.fillStyle = MUTED;
+			ctx.font = `500 24px ${SANS}`;
+			ctx.fillText(`max ${r.max}`, right, mid + 38);
+		}
+		ctx.textAlign = "left";
+
+		// Name and the bar under it.
+		const nx = ax + size + 34;
+		const nw = right - sw - 48 - nx;
+		ctx.fillStyle = FG;
+		fitText(ctx, r.name, nx, mid - 2, nw, 600, 38, SANS);
+		const by = mid + 20;
+		roundRect(ctx, nx, by, nw, 10, 5);
+		ctx.fillStyle = "#ffffff12";
+		ctx.fill();
+		if (r.max != null && r.max > r.points) {
+			roundRect(ctx, nx, by, (nw * r.max) / scale, 10, 5);
+			ctx.fillStyle = `${ring ?? PRIMARY}40`;
+			ctx.fill();
+		}
+		if (r.points > 0) {
+			roundRect(ctx, nx, by, Math.max(10, (nw * r.points) / scale), 10, 5);
+			ctx.fillStyle = ring ?? PRIMARY;
+			ctx.fill();
+		}
+	});
+
+	// Footer: what's left to play, or who sat the week out.
+	const notes: string[] = [];
+	if (group.left.length) {
+		const live = group.left.filter((g) => g.live).length;
+		notes.push(
+			group.left.length <= 3
+				? `Still to play: ${group.left.map((g) => `${g.label}${g.live ? " (live)" : ""}`).join(", ")}`
+				: `${group.left.length} games left${live ? `, ${live} in progress` : ""}`,
+		);
+	}
+	if (group.noPicks.length) notes.push(`No picks: ${group.noPicks.join(", ")}`);
+	if (group.rows.some((r) => r.max != null))
+		notes.push("max = the most each player can still reach");
+	if (!notes.length) return;
+	ctx.fillStyle = "#ffffff30";
+	ctx.fillRect(PAD, H - PAD - 20 - (notes.length - 1) * 40, W - PAD * 2, 1);
+	ctx.fillStyle = MUTED;
+	notes.forEach((n, i) => {
+		fitText(
+			ctx,
+			n,
+			PAD,
+			H - PAD + 26 - (notes.length - 1 - i) * 40,
+			W - PAD * 2,
+			500,
+			26,
+			SANS,
+		);
 	});
 }
