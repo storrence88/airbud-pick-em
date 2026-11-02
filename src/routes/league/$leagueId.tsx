@@ -57,7 +57,7 @@ import {
 	type ScoringMode,
 	scorePick,
 } from "#/lib/scoring";
-import { shareCard } from "#/lib/share-card";
+import { groupShare, shareablePicks, shareCard } from "#/lib/share-card";
 import { tiebreakerGameId } from "#/lib/tiebreaker";
 import { cn } from "#/lib/utils";
 import { toResult, weekResults } from "#/lib/week-results";
@@ -487,24 +487,30 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 				: 0,
 		[past, userId, data.picks, games, league],
 	);
-	// Your week as a shareable card, once every game is final.
-	const card = useMemo(
-		() =>
-			shareCard({
-				userId,
-				rows: weekResults(
-					members.map((m) => m.user_id),
-					data.picks,
-					games,
-					{ mode: league.mode, pushValue: league.settings.pushValue },
-				),
-				games,
-				week: shown,
-				league: league.name,
-				mode: league.mode,
-			}),
-		[userId, members, data.picks, games, shown, league],
-	);
+	// Sharing: your week and the league's, from the first kickoff on. Only
+	// picks for games that have kicked off go in, so nothing leaks early.
+	const share = useMemo(() => {
+		const now = Date.now();
+		const rows = weekResults(
+			members.map((m) => m.user_id),
+			shareablePicks(data.picks, games, now),
+			games,
+			{ mode: league.mode, pushValue: league.settings.pushValue },
+		);
+		const base = {
+			rows,
+			games,
+			week: shown,
+			league: league.name,
+			mode: league.mode,
+			now,
+		};
+		return {
+			card: shareCard({ ...base, userId }),
+			group: groupShare({ ...base, names }),
+		};
+	}, [userId, members, names, data.picks, games, shown, league]);
+	const card = share.card;
 	const me = members.find((m) => m.user_id === userId);
 	const { game: openGameId } = Route.useSearch();
 	const navigate = Route.useNavigate();
@@ -538,14 +544,22 @@ function WeekPicks({ leagueId, week }: { leagueId: string; week?: number }) {
 				<div className="flex items-end justify-between gap-3">
 					<WeekSwitcher leagueId={leagueId} shown={shown} thisWeek={thisWeek} />
 					<div className="flex items-center gap-3">
-						{card && me && <ShareWeek card={card} player={me} />}
+						{share.group && (
+							<ShareWeek
+								week={shown}
+								card={card}
+								group={share.group}
+								me={me ?? null}
+								members={members}
+							/>
+						)}
 						{past ? (
 							<div className="flex items-baseline gap-2">
 								{/* Phones drop the label to leave room for the Share button. */}
 								<span
 									className={cn(
 										"text-xs font-semibold uppercase tracking-wider text-muted-foreground",
-										card && "hidden sm:inline",
+										share.group && "hidden sm:inline",
 									)}
 								>
 									Your week
