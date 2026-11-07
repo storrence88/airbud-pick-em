@@ -4,6 +4,7 @@
 
 import { teamByAbbr } from "./nfl/teams";
 import { initials } from "./profile";
+import { movedText, type SeasonShare } from "./season-share";
 import {
 	type CardPick,
 	type GroupShare,
@@ -251,6 +252,8 @@ function drawHeader(
 	H: number,
 	accent: string,
 	card: { week: number; league: string; status: ShareStatus },
+	/** The big label on the right; defaults to "WEEK N". */
+	heading = `WEEK ${card.week}`,
 ) {
 	// Background: dark, with a soft glow in the accent color up top.
 	ctx.fillStyle = BG;
@@ -271,7 +274,7 @@ function drawHeader(
 	ctx.textAlign = "right";
 	ctx.fillStyle = FG;
 	ctx.font = `600 44px ${DISPLAY}`;
-	ctx.fillText(`WEEK ${card.week}`, W - PAD, y);
+	ctx.fillText(heading, W - PAD, y);
 	y += 50;
 	// Where the week stands, under the week: a dot while games are on.
 	ctx.font = `600 30px ${DISPLAY}`;
@@ -545,4 +548,106 @@ export function drawGroupCard(
 			SANS,
 		);
 	});
+}
+
+const SEASON_ROW = 112;
+
+/** Small leagues get roomier rows so the square card doesn't look empty. */
+function seasonRow(rows: number) {
+	return Math.min(140, Math.max(SEASON_ROW, Math.floor(670 / rows)));
+}
+
+/** The season card grows with the league like the group card. */
+export function seasonCardHeight(rows: number) {
+	return Math.max(1080, 300 + rows * seasonRow(rows) + 110);
+}
+
+const GOLD = "#f5c451";
+
+/**
+ * The season standings on one image: place, avatar, name, last week's points
+ * and who moved, with the season total on the right.
+ */
+export function drawSeasonCard(
+	ctx: CanvasRenderingContext2D,
+	share: SeasonShare,
+	players: Map<string, CardPlayer>,
+) {
+	const W = CARD_WIDTH;
+	const H = seasonCardHeight(share.rows.length);
+	const top = drawHeader(ctx, W, H, GOLD, share, "SEASON") + 70;
+	const rowH = seasonRow(share.rows.length);
+
+	share.rows.forEach((r, i) => {
+		const y = top + i * rowH;
+		const mid = y + rowH / 2;
+		const leader = r.behind === 0;
+		if (i > 0) {
+			ctx.fillStyle = "#ffffff14";
+			ctx.fillRect(PAD, y, W - PAD * 2, 1);
+		}
+		const player = players.get(r.userId);
+		const fav = teamByAbbr(player?.favorite_team);
+		const ring = fav ? accentColors(fav).accent : null;
+
+		// Place, gold for whoever's on top.
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.fillStyle = leader ? GOLD : MUTED;
+		ctx.font = `600 40px ${DISPLAY}`;
+		ctx.fillText(String(r.place), PAD + 22, mid + 2);
+		ctx.textAlign = "left";
+		ctx.textBaseline = "alphabetic";
+
+		const size = 72;
+		const ax = PAD + 70;
+		if (player) drawAvatar(ctx, player, ax, mid - size / 2, size, ring);
+
+		// Season total on the right, and how far back under it.
+		const right = W - PAD;
+		ctx.textAlign = "right";
+		ctx.fillStyle = FG;
+		ctx.font = `700 56px ${DISPLAY}`;
+		const total = String(r.total);
+		ctx.fillText(total, right, r.behind ? mid + 8 : mid + 20);
+		const sw = ctx.measureText(total).width;
+		if (r.behind) {
+			ctx.fillStyle = MUTED;
+			ctx.font = `500 24px ${SANS}`;
+			ctx.fillText(`−${r.behind}`, right, mid + 40);
+		}
+		ctx.textAlign = "left";
+
+		// Name, then last week's points and the move.
+		const nx = ax + size + 34;
+		const nw = right - sw - 48 - nx;
+		ctx.fillStyle = FG;
+		fitText(ctx, r.name, nx, mid - 4, nw, 600, 38, SANS);
+		ctx.font = `500 26px ${SANS}`;
+		ctx.fillStyle = MUTED;
+		const wk = `Wk ${share.week}: +${r.week}`;
+		ctx.fillText(wk, nx, mid + 34);
+		const ww = ctx.measureText(wk).width;
+		const move = movedText(r.moved);
+		if (move) {
+			ctx.font = `600 26px ${SANS}`;
+			ctx.fillStyle = r.moved > 0 ? WIN : LOSS;
+			ctx.fillText(move, nx + ww + 22, mid + 34);
+		}
+	});
+
+	// Footer: what the numbers mean.
+	ctx.fillStyle = "#ffffff30";
+	ctx.fillRect(PAD, H - PAD - 20, W - PAD * 2, 1);
+	ctx.fillStyle = MUTED;
+	fitText(
+		ctx,
+		`Season points through final games · ▲▼ places moved in Week ${share.week}`,
+		PAD,
+		H - PAD + 26,
+		W - PAD * 2,
+		500,
+		26,
+		SANS,
+	);
 }

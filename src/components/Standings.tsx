@@ -21,6 +21,7 @@ import {
 import { Avatar } from "./Avatar";
 import { BADGE_STYLE, StreakFlame } from "./Flair";
 import { PlayerLink } from "./PlayerSheet";
+import { ShareSeason } from "./ShareSeason";
 import { RowsSkeleton } from "./Skeleton";
 import { WeekLeaderboard } from "./WeekLeaderboard";
 
@@ -30,23 +31,26 @@ export function Standings({ leagueId }: { leagueId: string }) {
 	const members = new Map(week.members.map((m) => [m.user_id, m]));
 	return (
 		<section className="mt-6">
-			<div className="mb-4 inline-flex rounded-full border p-0.5 text-xs font-semibold">
-				{(["season", "weekly"] as const).map((v) => (
-					<button
-						key={v}
-						type="button"
-						aria-pressed={view === v}
-						onClick={() => setView(v)}
-						className={cn(
-							"h-7 rounded-full px-3.5 capitalize transition-colors",
-							view === v
-								? "bg-muted text-foreground"
-								: "text-muted-foreground hover:text-foreground",
-						)}
-					>
-						{v}
-					</button>
-				))}
+			<div className="mb-4 flex items-center justify-between gap-3">
+				<div className="inline-flex rounded-full border p-0.5 text-xs font-semibold">
+					{(["season", "weekly"] as const).map((v) => (
+						<button
+							key={v}
+							type="button"
+							aria-pressed={view === v}
+							onClick={() => setView(v)}
+							className={cn(
+								"h-7 rounded-full px-3.5 capitalize transition-colors",
+								view === v
+									? "bg-muted text-foreground"
+									: "text-muted-foreground hover:text-foreground",
+							)}
+						>
+							{v}
+						</button>
+					))}
+				</div>
+				{view === "season" && <ShareSeason leagueId={leagueId} />}
 			</div>
 			{view === "season" ? (
 				<SeasonStandings leagueId={leagueId} />
@@ -63,10 +67,11 @@ export function Standings({ leagueId }: { leagueId: string }) {
 	);
 }
 
-function SeasonStandings({ leagueId }: { leagueId: string }) {
+/** The season table, shared by the list and the Share button so they always agree. */
+export function useSeasonStandings(leagueId: string) {
 	const { data: week } = useSuspenseQuery(leagueWeekQuery(leagueId));
 	const { data, isLoading } = useQuery(standingsQuery(leagueId));
-	const { rows, flair, formerRows } = useMemo(() => {
+	const computed = useMemo(() => {
 		if (!data)
 			return {
 				rows: [],
@@ -90,6 +95,12 @@ function SeasonStandings({ leagueId }: { leagueId: string }) {
 			),
 		};
 	}, [data, week]);
+	return { week, data, isLoading, ...computed };
+}
+
+function SeasonStandings({ leagueId }: { leagueId: string }) {
+	const { week, data, isLoading, rows, flair, formerRows } =
+		useSeasonStandings(leagueId);
 	const formers = new Map(data?.formers.map((f) => [f.user_id, f]));
 	const members = new Map(week.members.map((m) => [m.user_id, m]));
 	const lastWeek =
